@@ -8,12 +8,14 @@ class UDPClient
 {
 public:
 	UDPClient(const char*  targetIP, int32_t targetPort);
-	size_t Send(const char* buffer, size_t bufferSize);
+	int Send(const char* buffer, size_t bufferSize);
+	int ReceiveFromLocal(char* buffer, size_t bufferSize);
+	int ReceiveFromRemote(char* buffer, size_t bufferSize);
 	~UDPClient();
 private:
 	SOCKET receivingSocket;
 	SOCKET outgoingSocket;
 	sockaddr_in outgoingAddress;
-
+	sockaddr_in receivingAddress;
 };
 
