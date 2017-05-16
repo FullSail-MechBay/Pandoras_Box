@@ -139,6 +139,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\DirtRallyPacketStructure.h" />
     <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\UDPClient.h" />
   </ItemGroup>
   <ItemGroup>

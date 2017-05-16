@@ -1,6 +1,6 @@
 #pragma once
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
-#include <stdint.h>
+#include <cstdint>
 #include <WinSock2.h>
 #pragma comment(lib, "WS2_32.lib")
 

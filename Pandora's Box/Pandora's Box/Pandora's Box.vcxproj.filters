@@ -18,6 +18,9 @@
     <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\UDPClient.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\DirtRallyPacketStructure.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Pandora%27s Box\Pandora%27s Box\UDPClient.cpp">
