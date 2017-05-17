@@ -29,17 +29,17 @@ UDPClient::UDPClient(const char*  targetIP, int32_t targetPort)
 }
 int UDPClient::Send(const char* buffer, size_t bufferSize)
 {
-	return sendto(outgoingSocket, buffer, (int)bufferSize, 0, (sockaddr*)&outgoingAddress, sizeof(sockaddr_in));
+	return sendto(outgoingSocket, buffer, static_cast<int>(bufferSize), 0, (sockaddr*)&outgoingAddress, sizeof(sockaddr_in));
 }
 
 int UDPClient::ReceiveFromRemote(char* buffer, size_t bufferSize)
 {
-	return recvfrom(outgoingSocket, buffer, (int)bufferSize, 0, nullptr, nullptr);
+	return recvfrom(outgoingSocket, buffer, static_cast<int>(bufferSize), 0, nullptr, nullptr);
 }
 
 int UDPClient::ReceiveFromLocal(char* buffer, size_t bufferSize)
 {
-	return recvfrom(receivingSocket, buffer, (int)bufferSize, 0, nullptr, nullptr);
+	return recvfrom(receivingSocket, buffer, static_cast<int>(bufferSize), 0, nullptr, nullptr);
 }
 
 UDPClient::~UDPClient()

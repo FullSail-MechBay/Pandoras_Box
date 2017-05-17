@@ -23,6 +23,8 @@ int main()
 	uint64_t packetSent = 0;
 	bool ongoingBufferChanged = false;
 	bool receivingBufferChanged = false;
+	bool statusBufferChanged = false;
+
 	bool networkSwitch = true;
 	bool programRun = true;
 
@@ -59,7 +61,7 @@ int main()
 		}
 	};
 
-	auto ReceivingFromPlatform = [&]()
+	auto StatusFromPlatform = [&]()
 	{
 		while (programRun)
 		{
@@ -69,7 +71,7 @@ int main()
 				{
 					if (mut.try_lock())
 					{
-						receivingBufferChanged = true;
+						statusBufferChanged = true;
 						mut.unlock();
 					}
 				}
@@ -78,7 +80,7 @@ int main()
 	};
 
 
-	auto ReceivingFromDirt = [&]()
+	auto DataFromDirt = [&]()
 	{
 		while (programRun)
 		{
@@ -113,9 +115,18 @@ int main()
 
 	};
 
+	std::array<std::shared_future<void>, 3> asyncTasks;
+	enum eTASK_NAME
+	{
+		RecvGameData = 0,
+		RecvStatus,
+		Send,
+	};
+	asyncTasks[RecvGameData] = std::async(std::launch::async, DataFromDirt);
+	asyncTasks[RecvStatus] = std::async(std::launch::async, StatusFromPlatform);
+	asyncTasks[Send] = std::async(std::launch::async, SendingToPlatform);
 
-	auto net_SendThread = std::async(std::launch::async, SendingToPlatform);
-	auto net_RecvGameDataThread = std::async(std::launch::async, ReceivingFromDirt);
+
 
 
 	auto programBeginTime = timer.now();
@@ -128,7 +139,7 @@ int main()
 			mut.unlock();
 		}
 
-		if (GetAsyncKeyState('`'))
+		if (GetAsyncKeyState(VK_ESCAPE))
 		{
 			mut.lock();
 			programRun = !programRun;
@@ -163,9 +174,11 @@ int main()
 	auto timelapsed = (double)std::chrono::duration_cast<std::chrono::seconds>(timer.now() - programBeginTime).count();
 	std::cout << "Packet Sent Rate: " << (double)packetSent / timelapsed << "\n";
 
-	//End all other threads
-	net_SendThread.get();
-	net_RecvGameDataThread.get();
+	//Join all other threads
+	for (auto& task : asyncTasks)
+	{
+		task.get();
+	}
 
 	return 0;
 
