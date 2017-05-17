@@ -128,7 +128,6 @@ namespace DataManager
 
 	class MBCtoHostReader
 	{
-		uint32_t BufferSize;
 		uint8_t* Buffer;
 		void* BufferLocations[OSDW_NumOptions];
 
@@ -138,6 +137,8 @@ namespace DataManager
 	public:
 		MBCtoHostReader();
 		~MBCtoHostReader();
+
+		static uint32_t ReaderDataBufferSize;
 
 		uint8_t* GetBufferAdder() { return Buffer; };
 		// Returns nullptr if header MessageID != 200

@@ -3,6 +3,10 @@
 
 using namespace DataManager;
 
+uint32_t MBCtoHostReader::ReaderDataBufferSize = sizeof(StatusResponse)
++ sizeof(OSD_1_DOF) + sizeof(OSD_2_Length)
++ sizeof(OSD_3_Actuator) + sizeof(OSD_4_Accelerometer_Data);
+
 enum StatusWordBitParser
 {
 	SWBP_EncodedMachineState = 0x0000000F,
@@ -36,11 +40,8 @@ uint16_t StatusResponse::GetUpdateRate()
 
 MBCtoHostReader::MBCtoHostReader()
 {
-	BufferSize = sizeof(StatusResponse)
-		+ sizeof(OSD_1_DOF) + sizeof(OSD_2_Length)
-		+ sizeof(OSD_3_Actuator) + sizeof(OSD_4_Accelerometer_Data);
-	Buffer = new uint8_t[BufferSize];
-	memset(Buffer, 0, BufferSize);
+	Buffer = new uint8_t[ReaderDataBufferSize];
+	memset(Buffer, 0, ReaderDataBufferSize);
 
 	for (size_t OSD = 0; OSD < OSDW_NumOptions; OSD++)
 		BufferLocations[OSD] = nullptr;
