@@ -2,147 +2,219 @@
 #include <future>
 #include <chrono>
 #include <iostream>
+#include <iomanip>
 #include <mutex>
 #include "UDPClient.h"
 #include "DirtRallyPacketStructure.h"
 #include "PlatformDataManager.h"
 
+#define RECEIVING_STATUS 0	
 
-
-std::array<char32_t, 20> mainbuffer{ 0 };
-std::array<char32_t, 20> sendingbuffer{ 0 };
-std::array<char32_t, DirtRally::UDPPacketNoExtra::GetStructSizeinByte() / 4> receivingbuffer{ 0 };
-std::array<char32_t, 256> statusbuffer{ 0 };
-
-
-std::mutex mut;
-bool mainBufferChanged = false;
-bool receivingBufferChanged = false;
-bool networkSwitch = true;
-uint64_t packetSent = 0;
-void SendingWorker(UDPClient& client)
-{
-
-	while (networkSwitch)
-	{
-		if (mainBufferChanged)
-		{
-			if (mut.try_lock())
-			{
-				mainBufferChanged = false;
-				//Copy & Convert endianness 
-				for (size_t i = 0; i < sendingbuffer.size(); i++)
-				{
-					sendingbuffer[i] = htonl(mainbuffer[i]);
-				}
-
-				auto result = client.Send(reinterpret_cast<char *>(sendingbuffer.data()), sendingbuffer.size() * sizeof(sendingbuffer[0]));
-				if (result == SOCKET_ERROR)
-				{
-					wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
-				}
-				++packetSent;
-
-				mut.unlock();
-			}
-		}
-
-	}
-}
-
-void ReceivingWorker(UDPClient& client)
-{
-	while (networkSwitch)
-	{
-		if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(receivingbuffer.data()), receivingbuffer.size() * sizeof(receivingbuffer[0])))
-		{
-			std::cout << "received!\n";
-		}
-	}
-}
 
 int main()
 {
+	//Receiving Buffers
+	std::array<char32_t, (DirtRally::UDPPacketNoExtra::GetStructSizeinByte() >> 2)> incomingbuffer{ 0 };
+	std::array<char32_t, (DataManager::MBC_Header::GetStructSizeinByte() >> 2)> statusbuffer{ 0 };
+
+
 	//TODO: Reading from .ini
 	UDPClient client("10.20.24.139", 10991);
 	std::chrono::high_resolution_clock timer;
+	DataManager::PlatformDataManager datamanager;
+	std::mutex mut;
+	uint64_t packetSent = 0;
+	bool incomingBufferChanged = false;
+	bool statusBufferChanged = false;
 
-	auto ReceivingFromDirt = [&client]()
+	bool networkSwitch = true;
+	bool programRun = true;
+	auto programBeginTime = timer.now();
+
+	//Platform related data
+	const char* platformBufferPtr = reinterpret_cast<const char *>(datamanager.GetDataBufferAddress());
+	size_t platformBufferSize = datamanager.GetDataSize();
+
+
+	auto SendingToPlatform = [&]()
 	{
-		while (networkSwitch)
+		using namespace std::chrono_literals;
+		auto delay = 500us;
+		while (programRun)
 		{
-			if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(receivingbuffer.data()), receivingbuffer.size() * sizeof(receivingbuffer[0])))
+			if (networkSwitch)
 			{
-				if (mut.try_lock())
+				static auto lastTimeStamp = timer.now();
+
+				if (timer.now() >= lastTimeStamp + delay)
 				{
-					//std::cout << "received!\n";
-					receivingBufferChanged = true;
-					mut.unlock();
+					if (mut.try_lock())
+					{
+						static bool samePacket = false;
+						if (!samePacket)
+						{
+							datamanager.IncrimentPacketSequence();
+							samePacket = true;
+						}
+						else
+						{
+							samePacket = false;
+						}
+
+						auto result = client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+						if (result == SOCKET_ERROR)
+						{
+							wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
+						}
+						else
+						{
+							++packetSent;
+						}
+						mut.unlock();
+					}
+					lastTimeStamp += delay;
+				}
+				auto timelapsed = (double)std::chrono::duration_cast<std::chrono::seconds>(timer.now() - programBeginTime).count();
+				auto sendingRate = (double)packetSent / timelapsed;
+				std::cout << "\r  Packet Sent Rate: " << sendingRate;
+				if (sendingRate <= 2000)
+				{
+					if (delay > 0us)
+					{
+						delay -= 10us;
+					}
+				}
+				else
+				{
+					delay += 5us;
+				}
+
+
+
+
+			}
+
+		}
+	};
+
+	auto StatusFromPlatform = [&]()
+	{
+#if RECEIVING_STATUS
+		while (programRun)
+		{
+			if (networkSwitch)
+			{
+				if (-1 != client.ReceiveFromRemote(reinterpret_cast<char *>(statusbuffer.data()), statusbuffer.size() * sizeof(statusbuffer[0])))
+				{
+					if (mut.try_lock())
+					{
+						statusBufferChanged = true;
+						mut.unlock();
+					}
+				}
+			}
+		}
+#endif // RECEIVING_STATUS
+	};
+
+	auto DataFromDirt = [&]()
+	{
+		while (programRun)
+		{
+			if (networkSwitch)
+			{
+				if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(incomingbuffer.data()), incomingbuffer.size() * sizeof(incomingbuffer[0])))
+				{
+					if (mut.try_lock())
+					{
+						incomingBufferChanged = true;
+						mut.unlock();
+					}
 				}
 			}
 		}
 	};
 
-	auto parseDirtPacket = []()
+	auto parseDirtPacket = [&]()
 	{
-		if (receivingBufferChanged)
+		if (incomingBufferChanged)
 		{
 			if (mut.try_lock())
 			{
-				receivingBufferChanged = false;
+				incomingBufferChanged = false;
 				//No need to convert endianness
 				DirtRally::UDPPacketNoExtra packet;
-				memcpy(&packet, receivingbuffer.data(), receivingbuffer.size() * sizeof(receivingbuffer[0]));
+				memcpy(&packet, incomingbuffer.data(), sizeof(packet));
 				// Converting to platform data struct
+				//	datamanager.SetDataMode(DataManager::DataMode_DOF);
+				datamanager.SetDofData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+				datamanager.SyncBufferChanges();
+				platformBufferSize = datamanager.GetDataSize();
 				mut.unlock();
+
 			}
 		}
 
 	};
 
+	std::array<std::shared_future<void>, 3> asyncTasks;
+	enum eTASK_NAME
+	{
+		RecvGameData = 0,
+		Send,
+		RecvStatus,
+	};
+	asyncTasks[RecvGameData] = std::async(std::launch::async, DataFromDirt);
+	asyncTasks[Send] = std::async(std::launch::async, SendingToPlatform);
+	
 
-	std::shared_future<void> net_SendThread = std::async(std::launch::async, SendingWorker, std::ref(client));
-	std::shared_future<void> net_RecvThread = std::async(std::launch::async, ReceivingFromDirt);
+	asyncTasks[RecvStatus] = std::async(std::launch::async, StatusFromPlatform);
 
-	bool run = true;
-	auto programBeginTime = timer.now();
-	while (run)
+
+
+
+
+	while (programRun)
 	{
 		if (GetAsyncKeyState('P'))
 		{
-			networkSwitch = false;
+			mut.lock();
+			networkSwitch = !networkSwitch;
+			mut.unlock();
 		}
 
 		if (GetAsyncKeyState(VK_ESCAPE))
 		{
-			run = false;
-		}
-
-		static auto startTimeStamp = timer.now();
-
-		auto curTimeStamp = timer.now();
-		if (curTimeStamp >= startTimeStamp + std::chrono::microseconds(495))
-		{
-			static char dummyDataSegement = 0;
 			mut.lock();
-			for (auto& i : mainbuffer)
-			{
-				i = dummyDataSegement;
-			}
-			mainBufferChanged = true;
+			programRun = !programRun;
 			mut.unlock();
-			dummyDataSegement++;
-			startTimeStamp = curTimeStamp;
 		}
+
+
 
 		parseDirtPacket();
 
 
+
+
+
 	}
-	auto timelapsed = (double)std::chrono::duration_cast<std::chrono::seconds>(timer.now() - programBeginTime).count();
-	std::cout << "Packet Sent Rate: " << (double)packetSent / timelapsed << "\n";
-	net_SendThread.get();
-	net_RecvThread.get();
+
+
+
+
+	//Finishing up
+	/*auto timelapsed = (double)std::chrono::duration_cast<std::chrono::seconds>(timer.now() - programBeginTime).count();
+	std::cout << "Packet Sent Rate: " << (double)packetSent / timelapsed << "\n";*/
+	
+	//shutdown sockets
+	client.Shutdown();
+	//Join all other threads
+	for (auto& task : asyncTasks)
+	{
+		task.get();
+	}
+
 	return 0;
 
 }

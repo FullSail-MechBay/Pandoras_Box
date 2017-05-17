@@ -11,6 +11,7 @@ public:
 	int Send(const char* buffer, size_t bufferSize);
 	int ReceiveFromLocal(char* buffer, size_t bufferSize);
 	int ReceiveFromRemote(char* buffer, size_t bufferSize);
+	void Shutdown();
 	~UDPClient();
 private:
 	SOCKET receivingSocket;
