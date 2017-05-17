@@ -21,6 +21,7 @@ uint32_t PlatformDataManager::CurrPacketSequenceCount = 0;
 
 PlatformDataManager::PlatformDataManager()
 {
+	HeaderSize = sizeof(Header);
 	DataDirty = true;
 	CurrMode = DataMode_DOF;
 	DataByteSize = 0;

@@ -24,6 +24,9 @@
     <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\PlatformDataManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\MBCtoHostReader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Pandora%27s Box\Pandora%27s Box\UDPClient.cpp">
@@ -33,6 +36,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Pandora%27s Box\Pandora%27s Box\PlatformDataManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Pandora%27s Box\Pandora%27s Box\MBCtoHostReader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

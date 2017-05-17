@@ -65,101 +65,6 @@ namespace DataManager
 
 #pragma endregion
 
-#pragma region MBC To Host Data Structs
-
-	struct MBC_Header
-	{
-		uint32_t PacketLength = 0;		// Not including this header
-		uint32_t PacketSeqCount = 0;
-		uint32_t Reserved = 0;
-		uint32_t MessageID = 0;			// Should be 200
-	};
-
-	enum Optional_Status_Data
-	{
-		OSD_None = 0,
-		OSD_DOF = 1,
-		OSD_Length = 2,
-		OSD_Data = 3,
-		OSD_Accelerometer = 4
-	};
-
-	struct StatusResponse
-	{
-		uint32_t MachineStatus = 0;
-		uint32_t Discrete_IO = 0;
-		uint32_t Latched_Fault_Data_1 = 0;
-		uint32_t Latched_Fault_Data_2 = 0;
-		uint32_t Latched_Fault_Data_3 = 0;
-		uint32_t OptionalStatusData = OSD_None;		// Optional_Status_Data
-	};
-
-	// OSD_# : Optional Status Data Number
-	struct OSD_1_DOF
-	{
-		uint32_t Roll = 0;				// Radians
-		uint32_t Pitch = 0;				// Radians
-		uint32_t Yaw = 0;				// Radians
-		uint32_t Longitudinal_X = 0;	// Meters
-		uint32_t Lateral_Y = 0;			// Meters
-		uint32_t Heave_Z = 0;			// Meters
-		uint32_t OptionalStatusData = OSD_None;		// Optional_Status_Data
-	};
-
-	// OSD_# : Optional Status Data Number
-	struct OSD_2_Length
-	{
-		uint32_t Actuator_A = 0;	// Meters
-		uint32_t Actuator_B = 0;	// Meters
-		uint32_t Actuator_C = 0;	// Meters
-		uint32_t Actuator_D = 0;	// Meters
-		uint32_t Actuator_E = 0;	// Meters
-		uint32_t Actuator_F = 0;	// Meters
-		uint32_t OptionalStatusData = OSD_None;		// Optional_Status_Data
-	};
-
-	// OSD_# : Optional Status Data Number
-	struct OSD_3_Actuator
-	{
-		struct FeedBackData
-		{
-			uint32_t Actuator_A = 0;
-			uint32_t Actuator_B = 0;
-			uint32_t Actuator_C = 0;
-			uint32_t Actuator_D = 0;
-			uint32_t Actuator_E = 0;
-			uint32_t Actuator_F = 0;
-		};
-
-		enum DataInfo
-		{
-			Data_Current = 0,			// (amps)
-			Data_Velocity = 1,			// (m/s)
-			Data_Following_Error = 2,	// (meters)
-			Data_NOT_USED_3 = 3,
-			Data_NOT_USED_4 = 4,
-			Data_NOT_USED_5 = 5,
-			Data_NOT_USED_6 = 6,
-			Data_NOT_USED_7 = 7,
-			Data_NOT_USED_8 = 8,
-			Data_NOT_USED_9 = 9
-		};
-
-		uint32_t NumMessages = 10;		// Value Range = 10... thats correct, just 10, currently no variance
-		FeedBackData DataArray[10];
-		uint32_t OptionalStatusData = OSD_None;		// Optional_Status_Data
-	};
-
-	struct OSD_4_Accelerometer_Data
-	{
-		uint32_t X = 0;		// Meters
-		uint32_t Y = 0;		// Meters
-		uint32_t Z = 0;		// Meters
-		uint32_t OptionalStatusData = OSD_None;		// Optional_Status_Data
-	};
-
-#pragma endregion
-
 	class PlatformDataManager
 	{
 
@@ -386,6 +291,7 @@ namespace DataManager
 
 		static uint8_t DataStructSizes[DataMode_NumModes];
 		static uint32_t CurrPacketSequenceCount;
+		uint32_t HeaderSize;
 
 		bool DataDirty;
 		DataModes		CurrMode;
