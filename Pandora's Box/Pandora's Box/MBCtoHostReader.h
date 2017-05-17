@@ -54,10 +54,10 @@ namespace DataManager
 		uint32_t Latched_Fault_Data_3 = 0;			// TODO: Set up functions to read bit flags.
 		uint32_t OptionalStatusData = OSDW_None;	// Optional_Status_Data
 
-		MachineState GetMachineState();
-		MotionCommandMode GetMotionCommandMode();
-		uint8_t GetMDATuningFileNum();
-		uint16_t GetUpdateRate();
+		MachineState GetMachineState() const;
+		MotionCommandMode GetMotionCommandMode()  const;
+		uint8_t GetMDATuningFileNum()  const;
+		uint16_t GetUpdateRate()  const;
 	};
 
 	// OSD_# : Optional Status Data Number

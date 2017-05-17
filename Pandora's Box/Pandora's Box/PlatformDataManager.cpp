@@ -213,7 +213,7 @@ void PlatformDataManager::SyncBufferChanges()
 	DataByteSize = ((Header*)DataBuffer)->PacketLength;
 	size_t numChunks = DataByteSize >> 2;
 	for (size_t DataChunk = 0; DataChunk < numChunks; DataChunk++)
-		DataSwapBuffer[DataChunk] = _byteswap_ulong(DataBuffer[DataChunk]);
+		((uint32_t*)DataSwapBuffer)[DataChunk] = _byteswap_ulong(DataBuffer[DataChunk]);
 	DataDirty = false;
 
 }

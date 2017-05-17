@@ -21,19 +21,19 @@ enum StatusBitOffsets
 	SBO_UDR = 16
 };
 
-MachineState StatusResponse::GetMachineState()
+MachineState StatusResponse::GetMachineState() const
 {
 	return (MachineState)(MachineStatus & SWBP_EncodedMachineState);
 }
-MotionCommandMode StatusResponse::GetMotionCommandMode()
+MotionCommandMode StatusResponse::GetMotionCommandMode() const
 {
 	return (MotionCommandMode)((MachineStatus & SWBP_MotionCommandMode) >> SBO_MCM);
 }
-uint8_t StatusResponse::GetMDATuningFileNum()
+uint8_t StatusResponse::GetMDATuningFileNum() const
 {
 	return (MachineStatus & SWBP_MDA_TuningFileNumber) >> SBO_MDA;
 }
-uint16_t StatusResponse::GetUpdateRate()
+uint16_t StatusResponse::GetUpdateRate() const
 {
 	return (MachineStatus & SWBP_UpdateRate) >> SBO_UDR;
 }
