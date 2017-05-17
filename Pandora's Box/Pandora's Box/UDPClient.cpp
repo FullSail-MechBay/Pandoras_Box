@@ -44,8 +44,8 @@ int UDPClient::ReceiveFromLocal(char* buffer, size_t bufferSize)
 
 void UDPClient::Shutdown()
 {
-	shutdown(outgoingSocket, 0);
-	shutdown(receivingSocket, 0);
+	shutdown(outgoingSocket, 2);
+	shutdown(receivingSocket, 2);
 	WSACleanup();
 }
 

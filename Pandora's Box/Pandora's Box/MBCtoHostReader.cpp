@@ -21,7 +21,7 @@ enum StatusBitOffsets
 	SBO_UDR = 16
 };
 
-MachineState StatusResponse::GetMachineState()
+MachineState StatusResponse::GetMachineState() const
 {
 	return (MachineState)(MachineStatus & SWBP_EncodedMachineState);
 }
