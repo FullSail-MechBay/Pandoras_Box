@@ -8,82 +8,95 @@
 #include "PlatformDataManager.h"
 
 
-
-std::array<char32_t, 20> mainbuffer{ 0 };
-std::array<char32_t, 20> sendingbuffer{ 0 };
-std::array<char32_t, DirtRally::UDPPacketNoExtra::GetStructSizeinByte() / 4> receivingbuffer{ 0 };
-std::array<char32_t, 256> statusbuffer{ 0 };
-
-
-std::mutex mut;
-bool mainBufferChanged = false;
-bool receivingBufferChanged = false;
-bool networkSwitch = true;
-uint64_t packetSent = 0;
-void SendingWorker(UDPClient& client)
-{
-
-	while (networkSwitch)
-	{
-		if (mainBufferChanged)
-		{
-			if (mut.try_lock())
-			{
-				mainBufferChanged = false;
-				//Copy & Convert endianness 
-				for (size_t i = 0; i < sendingbuffer.size(); i++)
-				{
-					sendingbuffer[i] = htonl(mainbuffer[i]);
-				}
-
-				auto result = client.Send(reinterpret_cast<char *>(sendingbuffer.data()), sendingbuffer.size() * sizeof(sendingbuffer[0]));
-				if (result == SOCKET_ERROR)
-				{
-					wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
-				}
-				++packetSent;
-
-				mut.unlock();
-			}
-		}
-
-	}
-}
-
-void ReceivingWorker(UDPClient& client)
-{
-	while (networkSwitch)
-	{
-		if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(receivingbuffer.data()), receivingbuffer.size() * sizeof(receivingbuffer[0])))
-		{
-			std::cout << "received!\n";
-		}
-	}
-}
-
 int main()
 {
+	//Receiving Buffers
+	std::array<char32_t, (DirtRally::UDPPacketNoExtra::GetStructSizeinByte() >> 2)> receivingbuffer{ 0 };
+	std::array<char32_t, (DataManager::MBC_Header::GetStructSizeinByte() >> 2)> statusbuffer{ 0 };
+
+
 	//TODO: Reading from .ini
 	UDPClient client("10.20.24.139", 10991);
 	std::chrono::high_resolution_clock timer;
+	DataManager::PlatformDataManager datamanager;
+	std::mutex mut;
+	uint64_t packetSent = 0;
+	bool ongoingBufferChanged = false;
+	bool receivingBufferChanged = false;
+	bool networkSwitch = true;
+	bool programRun = true;
 
-	auto ReceivingFromDirt = [&client]()
+
+	//Platform related data
+	const char* platformBufferPtr = reinterpret_cast<const char *>(datamanager.GetDataBufferAddress());
+	size_t platformBufferSize = datamanager.GetDataSize();
+
+
+	auto SendingToPlatform = [&]()
 	{
-		while (networkSwitch)
+		while (programRun)
 		{
-			if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(receivingbuffer.data()), receivingbuffer.size() * sizeof(receivingbuffer[0])))
+			if (networkSwitch)
 			{
-				if (mut.try_lock())
+				if (ongoingBufferChanged)
 				{
-					//std::cout << "received!\n";
-					receivingBufferChanged = true;
-					mut.unlock();
+					if (mut.try_lock())
+					{
+						ongoingBufferChanged = false;
+						auto result = client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+						if (result == SOCKET_ERROR)
+						{
+							wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
+						}
+						++packetSent;
+
+						mut.unlock();
+					}
+				}
+
+			}
+
+		}
+	};
+
+	auto ReceivingFromPlatform = [&]()
+	{
+		while (programRun)
+		{
+			if (networkSwitch)
+			{
+				if (-1 != client.ReceiveFromRemote(reinterpret_cast<char *>(statusbuffer.data()), statusbuffer.size() * sizeof(statusbuffer[0])))
+				{
+					if (mut.try_lock())
+					{
+						receivingBufferChanged = true;
+						mut.unlock();
+					}
 				}
 			}
 		}
 	};
 
-	auto parseDirtPacket = []()
+
+	auto ReceivingFromDirt = [&]()
+	{
+		while (programRun)
+		{
+			if (networkSwitch)
+			{
+				if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(receivingbuffer.data()), receivingbuffer.size() * sizeof(receivingbuffer[0])))
+				{
+					if (mut.try_lock())
+					{
+						receivingBufferChanged = true;
+						mut.unlock();
+					}
+				}
+			}
+		}
+	};
+
+	auto parseDirtPacket = [&]()
 	{
 		if (receivingBufferChanged)
 		{
@@ -101,21 +114,25 @@ int main()
 	};
 
 
-	std::shared_future<void> net_SendThread = std::async(std::launch::async, SendingWorker, std::ref(client));
-	std::shared_future<void> net_RecvThread = std::async(std::launch::async, ReceivingFromDirt);
+	auto net_SendThread = std::async(std::launch::async, SendingToPlatform);
+	auto net_RecvGameDataThread = std::async(std::launch::async, ReceivingFromDirt);
 
-	bool run = true;
+
 	auto programBeginTime = timer.now();
-	while (run)
+	while (programRun)
 	{
 		if (GetAsyncKeyState('P'))
 		{
-			networkSwitch = false;
+			mut.lock();
+			networkSwitch = !networkSwitch;
+			mut.unlock();
 		}
 
-		if (GetAsyncKeyState(VK_ESCAPE))
+		if (GetAsyncKeyState('`'))
 		{
-			run = false;
+			mut.lock();
+			programRun = !programRun;
+			mut.unlock();
 		}
 
 		static auto startTimeStamp = timer.now();
@@ -123,15 +140,14 @@ int main()
 		auto curTimeStamp = timer.now();
 		if (curTimeStamp >= startTimeStamp + std::chrono::microseconds(495))
 		{
-			static char dummyDataSegement = 0;
 			mut.lock();
-			for (auto& i : mainbuffer)
-			{
-				i = dummyDataSegement;
-			}
-			mainBufferChanged = true;
+			datamanager.SetDataMode(DataManager::DataMode_DOF);
+			datamanager.SetDofData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+			datamanager.IncrimentPacketSequence();
+			datamanager.SyncBufferChanges();
+			platformBufferSize = datamanager.GetDataSize();
+			ongoingBufferChanged = true;
 			mut.unlock();
-			dummyDataSegement++;
 			startTimeStamp = curTimeStamp;
 		}
 
@@ -139,10 +155,17 @@ int main()
 
 
 	}
+
+
+
+
+	//Finishing up
 	auto timelapsed = (double)std::chrono::duration_cast<std::chrono::seconds>(timer.now() - programBeginTime).count();
 	std::cout << "Packet Sent Rate: " << (double)packetSent / timelapsed << "\n";
+
+	//End all other threads
 	net_SendThread.get();
-	net_RecvThread.get();
+	net_RecvGameDataThread.get();
 
 	return 0;
 

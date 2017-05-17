@@ -73,6 +73,10 @@ namespace DataManager
 		uint32_t PacketSeqCount = 0;
 		uint32_t Reserved = 0;
 		uint32_t MessageID = 0;			// Should be 200
+		static constexpr size_t GetStructSizeinByte()
+		{
+			return sizeof(MBC_Header);
+		}
 	};
 
 	struct StatusResponse
