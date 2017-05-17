@@ -42,7 +42,14 @@ int UDPClient::ReceiveFromLocal(char* buffer, size_t bufferSize)
 	return recvfrom(receivingSocket, buffer, static_cast<int>(bufferSize), 0, nullptr, nullptr);
 }
 
+void UDPClient::Shutdown()
+{
+	shutdown(outgoingSocket, 0);
+	shutdown(receivingSocket, 0);
+	WSACleanup();
+}
+
 UDPClient::~UDPClient()
 {
-	WSACleanup();
+	
 }
