@@ -203,12 +203,6 @@ const uint8_t* PlatformDataManager::GetDataBufferAddress()
 		SyncBufferChanges();
 	return DataSwapBuffer;
 }
-void PlatformDataManager::SetCommandState(Command_State _commandState)
-{
-	((PostHeader*)DataBuffer)->SetMotionCommandWord(_commandState);
-
-	DataDirty = true;
-}
 void PlatformDataManager::SyncBufferChanges()
 {
 	if (!DataDirty)
@@ -223,12 +217,24 @@ void PlatformDataManager::SyncBufferChanges()
 
 }
 
+void PlatformDataManager::SetCommandState(Command_State _commandState)
+{
+	((PostHeader*)DataBuffer)->SetMotionCommandWord(_commandState);
+
+	DataDirty = true;
+}
 uint8_t PlatformDataManager::SetDataMode(DataModes _newMode)
 {
+	uint8_t returnCode = 2;
 	if (_newMode == CurrMode)
-		return 1;
+		returnCode = 1;
+	else
+	{
+		returnCode = DefaultOutBuffer(_newMode);
+		((PostHeader*)DataBuffer)->SetMotionCommandWord(CommandState_DISENGAGE);
+	}
 
-	return DefaultOutBuffer(_newMode);
+	return returnCode;
 }
 uint8_t PlatformDataManager::SetDefaultData(DataModes _newMode)
 {
@@ -327,6 +333,7 @@ void PlatformDataManager::Helper_SetUpDefualtData(DataModes _dataMode)
 
 	DataModeHeaders[CurrMode]->Initialize(CurrMode);
 	std::memcpy(DataBuffer, DataModeHeaders[CurrMode], DataStructSizes[CurrMode]);
+	DataDirty = true;
 }
 
 void PlatformDataManager::SyncPacketSequence()
@@ -337,7 +344,6 @@ void PlatformDataManager::SyncPacketSequence()
 uint8_t PlatformDataManager::DefaultOutBuffer(DataModes _dataMode)
 {
 	Helper_SetUpDefualtData(_dataMode);
-	((PostHeader*)DataBuffer)->SetMotionCommandWord(CommandState_DISENGAGE);
 	return (_dataMode == CurrMode) ? 0 : 2;
 }
 

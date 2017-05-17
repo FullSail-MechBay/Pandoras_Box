@@ -422,16 +422,20 @@ namespace DataManager
 		const uint32_t GetDataSize() { return DataByteSize; };
 		const uint32_t GetPacketSequence() { return CurrPacketSequenceCount; };
 
+		// !! Not thread safe !!
 		// Does not require syncing the buffer afterwards
 		void IncrimentPacketSequence();
+		// !! Not thread safe !!
 		// Does not require syncing the buffer afterwards
 		void SetPacketSequence(uint32_t _value);
+		// !! Not thread safe !!
 		// This pointer should not change during the life of this object
 		const uint8_t* GetDataBufferAddress();
-		void SetCommandState(Command_State _commandState);
+		// !! Not thread safe !!
 		// Swaps changes made to data packet into the buffer for data transfer
 		void SyncBufferChanges();
 
+		void SetCommandState(Command_State _commandState);
 		// IF _newMode != current mode it sets the buffer data to the default values for passed in data mode
 		// Return Value: 0: Success, 1: Same Mode(No Change), 2: Failed
 		uint8_t SetDataMode(DataModes _newMode);
