@@ -41,6 +41,7 @@ PlatformDataManager::PlatformDataManager()
 	DataBuffer = new uint8_t[DM_DataBufferSize];
 	DataSwapBuffer = new uint8_t[DM_DataBufferSize];
 	Helper_SetUpDefualtData(CurrMode);
+	SyncBufferChanges();
 }
 PlatformDataManager::~PlatformDataManager()
 {
@@ -212,11 +213,14 @@ void PlatformDataManager::SyncBufferChanges()
 {
 	if (!DataDirty)
 		return;
+
 	((Header*)DataBuffer)->PacketSequenceCount = CurrPacketSequenceCount;
+	DataByteSize = ((Header*)DataBuffer)->PacketLength;
 	size_t numChunks = DataByteSize >> 2;
 	for (size_t DataChunk = 0; DataChunk < numChunks; DataChunk++)
 		DataSwapBuffer[DataChunk] = _byteswap_ulong(DataBuffer[DataChunk]);
 	DataDirty = false;
+
 }
 
 uint8_t PlatformDataManager::SetDataMode(DataModes _newMode)
@@ -224,9 +228,11 @@ uint8_t PlatformDataManager::SetDataMode(DataModes _newMode)
 	if (_newMode == CurrMode)
 		return 1;
 
-	Helper_SetUpDefualtData(_newMode);
-	((PostHeader*)DataBuffer)->SetMotionCommandWord(CommandState_DISENGAGE);
-	return (_newMode == CurrMode) ? 0 : 2;
+	return DefaultOutBuffer(_newMode);
+}
+uint8_t PlatformDataManager::SetDefaultData(DataModes _newMode)
+{
+	return DefaultOutBuffer(_newMode);
 }
 uint8_t PlatformDataManager::SetDofData(float _roll, float _pitch, float _yaw, float _surge, float _sway, float _heave)
 {
@@ -299,7 +305,6 @@ uint8_t PlatformDataManager::SetMotionCueData(
 void PlatformDataManager::Helper_SetUpDefualtData(DataModes _dataMode)
 {
 	CurrMode = _dataMode;
-	DataByteSize = 0;
 
 	if (nullptr == DataModeHeaders[CurrMode])
 		switch (CurrMode)
@@ -321,12 +326,19 @@ void PlatformDataManager::Helper_SetUpDefualtData(DataModes _dataMode)
 		}
 
 	DataModeHeaders[CurrMode]->Initialize(CurrMode);
-	std::memcpy(DataBuffer, DataModeHeaders[CurrMode], DataByteSize = DataStructSizes[CurrMode]);
+	std::memcpy(DataBuffer, DataModeHeaders[CurrMode], DataStructSizes[CurrMode]);
 }
 
 void PlatformDataManager::SyncPacketSequence()
 {
 	((Header*)DataSwapBuffer)->PacketSequenceCount = _byteswap_ulong(((Header*)DataBuffer)->PacketSequenceCount = CurrPacketSequenceCount);
+}
+
+uint8_t PlatformDataManager::DefaultOutBuffer(DataModes _dataMode)
+{
+	Helper_SetUpDefualtData(_dataMode);
+	((PostHeader*)DataBuffer)->SetMotionCommandWord(CommandState_DISENGAGE);
+	return (_dataMode == CurrMode) ? 0 : 2;
 }
 
 #pragma endregion
