@@ -143,7 +143,6 @@ int main()
 	std::cout << "Packet Sent Rate: " << (double)packetSent / timelapsed << "\n";
 	net_SendThread.get();
 	net_RecvThread.get();
-
 	return 0;
 
 }

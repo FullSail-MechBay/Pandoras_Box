@@ -75,6 +75,15 @@ namespace DataManager
 		uint32_t MessageID = 0;			// Should be 200
 	};
 
+	enum Optional_Status_Data
+	{
+		OSD_None = 0,
+		OSD_DOF = 1,
+		OSD_Length = 2,
+		OSD_Data = 3,
+		OSD_Accelerometer = 4
+	};
+
 	struct StatusResponse
 	{
 		uint32_t MachineStatus = 0;
@@ -83,15 +92,6 @@ namespace DataManager
 		uint32_t Latched_Fault_Data_2 = 0;
 		uint32_t Latched_Fault_Data_3 = 0;
 		uint32_t OptionalStatusData = OSD_None;		// Optional_Status_Data
-	};
-
-	enum Optional_Status_Data
-	{
-		OSD_None = 0,
-		OSD_DOF = 1,
-		OSD_Length = 2,
-		OSD_Data = 3,
-		OSD_Accelerometer = 4
 	};
 
 	// OSD_# : Optional Status Data Number
@@ -419,6 +419,7 @@ namespace DataManager
 		~PlatformDataManager();
 
 		// Packet Byte size
+		// !! Potentially Not thread safe while SyncBufferChange() is being called !!
 		const uint32_t GetDataSize() { return DataByteSize; };
 		const uint32_t GetPacketSequence() { return CurrPacketSequenceCount; };
 
@@ -428,7 +429,7 @@ namespace DataManager
 		// !! Not thread safe !!
 		// Does not require syncing the buffer afterwards
 		void SetPacketSequence(uint32_t _value);
-		// !! Not thread safe !!
+		// !! Not thread safe if changes were made since last call or last Sync !!
 		// This pointer should not change during the life of this object
 		const uint8_t* GetDataBufferAddress();
 		// !! Not thread safe !!
