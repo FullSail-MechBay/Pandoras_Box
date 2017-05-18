@@ -79,7 +79,7 @@ namespace DataManager
 			uint32_t PacketLength;			// Length does not incude size of Header
 			uint32_t PacketSequenceCount;
 			void SetMotionMode(MotionMode _motionModeID) { MessageID = _motionModeID; };
-			virtual void Initialize(DataModes _dataMode);
+			void Initialize(DataModes _dataMode);
 
 		private:
 			uint32_t RESERVED;
@@ -90,7 +90,7 @@ namespace DataManager
 		{
 			PostHeader();
 
-			virtual void Initialize(DataModes _dataMode) override;
+			void Initialize(DataModes _dataMode);
 
 			void SetMotionCommandWord(Command_State _newCommandState = CommandState_NO_CHANGE) { MotionCommandWord = _newCommandState; };
 			void SetStatusResponseWord(FeedBackReq _requestedFeedBack = FBR_AlarmList, uint8_t _fileIDNumber = 0, uint16_t _updateRate = Freq_Dof);
@@ -117,7 +117,7 @@ namespace DataManager
 			float Heave;	// Meters
 			uint32_t SpecialEffects;
 
-			virtual void Initialize(DataModes _dataMode) override;
+			void Initialize(DataModes _dataMode);
 		};
 
 		struct Data_Length : public PostHeader
@@ -130,7 +130,7 @@ namespace DataManager
 			float ActuatorLength_F;		// Meters
 			uint32_t SpecialEffects;
 
-			virtual void Initialize(DataModes _dataMode) override;
+			void Initialize(DataModes _dataMode);
 		};
 
 		struct Data_MotionCue : public PostHeader
@@ -150,7 +150,7 @@ namespace DataManager
 			float Acceleration_Heave;	// Rad/Sec^2
 			uint32_t SpecialEffects;
 
-			virtual void Initialize(DataModes _dataMode) override;
+			void Initialize(DataModes _dataMode);
 		};
 		/* Note: Freeze Command:
 			When the MBC receives a Freeze command, motion is faded out over a 5 second period.
@@ -162,7 +162,7 @@ namespace DataManager
 		struct Data_PlayBack : public PostHeader
 		{
 			// PlayBack mode has no difference from PostHeader at the moment.
-			virtual void Initialize(DataModes _dataMode) override;
+			void Initialize(DataModes _dataMode);
 		};
 
 #pragma endregion

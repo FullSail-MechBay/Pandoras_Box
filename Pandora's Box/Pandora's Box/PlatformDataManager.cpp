@@ -27,7 +27,6 @@ PlatformDataManager::PlatformDataManager()
 	DataByteSize = 0;
 	DataBuffer = nullptr;
 	DataSwapBuffer = nullptr;
-
 	DataSFX01 = nullptr;
 	DataSFX02 = nullptr;
 	DataSFX03 = nullptr;
@@ -36,7 +35,6 @@ PlatformDataManager::PlatformDataManager()
 	DataSFX06 = nullptr;
 	DataSFX07 = nullptr;
 	DataSFX08 = nullptr;
-
 	for (size_t DataMode = 0; DataMode < DataMode_NumModes; DataMode++)
 		DataModeHeaders[DataMode] = nullptr;
 	DataBuffer = new uint8_t[DM_DataBufferSize];
