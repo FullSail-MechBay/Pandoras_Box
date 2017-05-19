@@ -203,8 +203,17 @@ int main()
 		datamanager.SetPacketSequence(1);
 		datamanager.SyncBufferChanges();
 		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		datamanager.IncrimentPacketSequence();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
+		datamanager.SyncBufferChanges();
+		datamanager.IncrimentPacketSequence();
+
+
+
 		shouldSend = true;
 		cv.notify_all();
+
 		std::cout << "Resumed\n";
 
 	};
@@ -284,10 +293,15 @@ int main()
 		datamanager.IncrimentPacketSequence();
 		datamanager.SyncBufferChanges();
 		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		datamanager.IncrimentPacketSequence();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
 		datamanager.SetCommandState(DataManager::CommandState_RESET);
 		datamanager.IncrimentPacketSequence();
 		datamanager.SyncBufferChanges();
 		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		datamanager.IncrimentPacketSequence();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+
 
 		//Shutdown sockets
 		client.Shutdown();
