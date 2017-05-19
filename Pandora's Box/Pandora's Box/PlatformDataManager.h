@@ -14,14 +14,14 @@ namespace DataManager
 
 	enum Command_State
 	{
-		CommandState_NO_CHANGE = 0,		// No Command Update (Normal Operating Mode)
-		CommandState_ENGAGE = 1,		// Makes Platform ready to run. * Valid Only in READY state
-		CommandState_DISENGAGE = 2,		// Causes the Motion Base to return to the SETTLED position under power.  Power is then removed from the motors. * Valid only in STANDBY & ENGAGED
-		CommandState_RESET = 3,			// Used to recover from any FAULT state. This command also restores normal operation after the INHIBIT command is received. * Valid only in STANDBY, ENGAGED & READY
-		CommandState_START = 4,			// Used only in Playback Mode.  Initiates start of motion after reaching ENGAGED state. * Valid only in ENGAGED state
-		CommandState_UP = 5,			// Used only with the “Draw Bridge Two” option. When received causes the drawbridge (access way) to go up. * Valid only in READY state
-		CommandState_DOWN = 6,			// Used only with the “Draw Bridge Two” option. When received causes the drawbridge (access way) to go down. * Valid only in READY state
-		CommandState_STOP = 7			// Used only with the “Draw Bridge Two” option. When received causes the drawbridge (access way) to disable. * Valid only in READY state
+		CommandState_NO_CHANGE,		// No Command Update (Normal Operating Mode)
+		CommandState_ENGAGE,		// Makes Platform ready to run. * Valid Only in READY state
+		CommandState_DISENGAGE,		// Causes the Motion Base to return to the SETTLED position under power.  Power is then removed from the motors. * Valid only in STANDBY & ENGAGED
+		CommandState_RESET,			// Used to recover from any FAULT state. This command also restores normal operation after the INHIBIT command is received. * Valid only in STANDBY, ENGAGED & READY
+		CommandState_START,			// Used only in Playback Mode.  Initiates start of motion after reaching ENGAGED state. * Valid only in ENGAGED state
+		CommandState_UP,			// Used only with the “Draw Bridge Two” option. When received causes the drawbridge (access way) to go up. * Valid only in READY state
+		CommandState_DOWN,			// Used only with the “Draw Bridge Two” option. When received causes the drawbridge (access way) to go down. * Valid only in READY state
+		CommandState_STOP			// Used only with the “Draw Bridge Two” option. When received causes the drawbridge (access way) to disable. * Valid only in READY state
 	};
 
 	// Requested Feedback Data: Bit mask that specifies the data that is requested to be paced by the MBC into the status response message.
@@ -36,34 +36,31 @@ namespace DataManager
 
 	enum SpecialEffectsCommand
 	{
-		SFX_NO_EFFECT = 0,						// Indicates that we have finished reading in all the command data
-		SFX_DIRECT_DISPLACEMENT_DOF = 1,		// (Applicable only with Message ID 100 and 102)
-		SFX_DIRECT_DISPLACEMENT_LENGTH = 2,		// 
-		SFX_DISPLACEMENT_BUFFET = 3,			// (Not applicable with option 8).(Applicable only with Message ID 100 and 102)
-		SFX_DISPLACEMENT_WHITE_NOISE = 4,		// Note: This Option results in displacement-based white noise, which is not recommended for use. Legacy support only. (Applicable only with Message ID 100 and 102)
-		SFX_CENTER_OF_GRAVITY = 5,				// (Applicable only with Message ID 102)
-		SFX_ON_GROUND = 6,						// (Applicable only with Message ID 102)
-		SFX_ACCELERATION_WHITE_NOISE = 7,		// (Applicable only with Message ID 100 and 102).(Applicable only with Message ID 100 and 102)
-		SFX_ACCELERATION_BUFFET = 8				// (Not applicable with option 3).(Applicable only with Message ID 100 and 102)
-	};
-
-	enum MotionMode
-	{
-		MotionMode_DOF = 100,
-		MotionMode_LENGTH = 101,
-		MotionMode_MOTION_CUE = 102,
-		MotionMode_PLAYBACK = 103
+		SFX_NO_EFFECT,						// Indicates that we have finished reading in all the command data
+		SFX_DIRECT_DISPLACEMENT_DOF,		// (Applicable only with Message ID 100 and 102)
+		SFX_DIRECT_DISPLACEMENT_LENGTH,		// 
+		SFX_DISPLACEMENT_BUFFET,			// (Not applicable with option 8).(Applicable only with Message ID 100 and 102)
+		SFX_DISPLACEMENT_WHITE_NOISE,		// Note: This Option results in displacement-based white noise, which is not recommended for use. Legacy support only. (Applicable only with Message ID 100 and 102)
+		SFX_CENTER_OF_GRAVITY,				// (Applicable only with Message ID 102)
+		SFX_ON_GROUND,						// (Applicable only with Message ID 102)
+		SFX_ACCELERATION_WHITE_NOISE,		// (Applicable only with Message ID 100 and 102).(Applicable only with Message ID 100 and 102)
+		SFX_ACCELERATION_BUFFET				// (Not applicable with option 3).(Applicable only with Message ID 100 and 102)
 	};
 
 	enum FeedBackFreq
 	{
-		Freq_Dof = 2000,
+		Freq_Dof = 1000,
 		Freq_Length = 2000,
 		Freq_MotionCue = 60,
 		Freq_PlayBack = 0
 	};
 
 #pragma endregion
+
+	static uint32_t MotionMode[DataMode_NumModes]
+	{
+		100, 101, 102, 103
+	};
 
 	class PlatformDataManager
 	{
@@ -78,7 +75,7 @@ namespace DataManager
 		{
 			uint32_t PacketLength;			// Length does not incude size of Header
 			uint32_t PacketSequenceCount;
-			void SetMotionMode(MotionMode _motionModeID) { MessageID = _motionModeID; };
+			void SetMotionMode(DataModes _dataMode) { MessageID = MotionMode[_dataMode]; };
 			void Initialize(DataModes _dataMode);
 
 		private:
@@ -94,9 +91,9 @@ namespace DataManager
 
 			void SetMotionCommandWord(Command_State _newCommandState = CommandState_NO_CHANGE) { MotionCommandWord = _newCommandState; };
 			void SetStatusResponseWord(FeedBackReq _requestedFeedBack = FBR_AlarmList, uint8_t _fileIDNumber = 0, uint16_t _updateRate = Freq_Dof);
-			inline void SetFeedBackReq(FeedBackReq _requestedFeedback = FBR_AlarmList) { StatusResponseWord &= (0xFFFFFF00 + _requestedFeedback); };
-			inline void SetReplayFile(uint8_t _fileIDNumber = 0) { StatusResponseWord &= (0xFFFF00FF + (_fileIDNumber << 8)); };
-			inline void SetUpdateRate(uint16_t _updateRate = Freq_Dof) { StatusResponseWord &= (0x0000FFFF + (_updateRate << 16)); };
+			inline void SetFeedBackReq(FeedBackReq _requestedFeedback = FBR_AlarmList) { StatusResponseWord = (StatusResponseWord & 0xFFFFFF00) | _requestedFeedback; };
+			inline void SetReplayFile(uint8_t _fileIDNumber = 0) { StatusResponseWord = (StatusResponseWord & 0xFFFF00FF) | (_fileIDNumber << 8); };
+			inline void SetUpdateRate(uint16_t _updateRate = Freq_Dof) { StatusResponseWord = (StatusResponseWord & 0x0000FFFF) | (_updateRate << 16); };
 
 		private:
 			uint32_t MotionCommandWord;	// Command_State
@@ -291,9 +288,9 @@ namespace DataManager
 
 		static uint8_t DataStructSizes[DataMode_NumModes];
 		static uint32_t CurrPacketSequenceCount;
-		uint32_t HeaderSize;
-
+		static uint32_t HeaderSize;
 		bool DataDirty;
+
 		DataModes		CurrMode;
 		uint32_t		DataByteSize;
 		uint8_t*		DataBuffer;

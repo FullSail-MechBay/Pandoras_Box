@@ -15,13 +15,12 @@ sizeof(Data_MotionCue),
 sizeof(Data_PlayBack)
 };
 
-uint32_t PlatformDataManager::CurrPacketSequenceCount = 0;
-
+uint32_t PlatformDataManager::CurrPacketSequenceCount = 1;
+uint32_t PlatformDataManager::HeaderSize = sizeof(PlatformDataManager::Header);
 #pragma endregion
 
 PlatformDataManager::PlatformDataManager()
 {
-	HeaderSize = sizeof(Header);
 	DataDirty = true;
 	CurrMode = DataMode_DOF;
 	DataByteSize = 0;
@@ -62,15 +61,16 @@ PlatformDataManager::~PlatformDataManager()
 
 void PlatformDataManager::Header::Initialize(DataModes _dataMode)
 {
-	PacketLength = DataStructSizes[_dataMode] - sizeof(PostHeader);
-	PacketSequenceCount = 0;
+	PacketLength = DataStructSizes[_dataMode] - HeaderSize;
+	PacketSequenceCount = 1;
 	RESERVED = 0;
-	MessageID = (MotionMode)_dataMode;
+	MessageID = MotionMode[_dataMode];
 }
 
 PlatformDataManager::PostHeader::PostHeader()
 {
-	SetStatusResponseWord();
+	MotionCommandWord = 0;
+	StatusResponseWord = 0;
 }
 void PlatformDataManager::PostHeader::Initialize(DataModes _dataMode)
 {
@@ -208,10 +208,10 @@ void PlatformDataManager::SyncBufferChanges()
 		return;
 
 	((Header*)DataBuffer)->PacketSequenceCount = CurrPacketSequenceCount;
-	DataByteSize = ((Header*)DataBuffer)->PacketLength;
+	DataByteSize = ((Header*)DataBuffer)->PacketLength + HeaderSize;
 	size_t numChunks = DataByteSize >> 2;
 	for (size_t DataChunk = 0; DataChunk < numChunks; DataChunk++)
-		((uint32_t*)DataSwapBuffer)[DataChunk] = _byteswap_ulong(DataBuffer[DataChunk]);
+		((uint32_t*)DataSwapBuffer)[DataChunk] = _byteswap_ulong(((uint32_t*)DataBuffer)[DataChunk]);
 	DataDirty = false;
 
 }
@@ -316,21 +316,24 @@ void PlatformDataManager::Helper_SetUpDefualtData(DataModes _dataMode)
 		{
 		case DataManager::DataMode_DOF:
 			DataModeHeaders[CurrMode] = new Data_Dof();
+			((Data_Dof*)DataModeHeaders[CurrMode])->Initialize(CurrMode);
 			break;
 		case DataManager::DataMode_Length:
 			DataModeHeaders[CurrMode] = new Data_Length();
+			((Data_Length*)DataModeHeaders[CurrMode])->Initialize(CurrMode);
 			break;
 		case DataManager::DataMode_Motion:
 			DataModeHeaders[CurrMode] = new Data_MotionCue();
+			((Data_MotionCue*)DataModeHeaders[CurrMode])->Initialize(CurrMode);
 			break;
 		case DataManager::DataMode_PlayBack:
 			DataModeHeaders[CurrMode] = new Data_PlayBack();
+			((Data_PlayBack*)DataModeHeaders[CurrMode])->Initialize(CurrMode);
 			break;
 		default:
 			break;
 		}
 
-	DataModeHeaders[CurrMode]->Initialize(CurrMode);
 	std::memcpy(DataBuffer, DataModeHeaders[CurrMode], DataStructSizes[CurrMode]);
 	DataDirty = true;
 }
