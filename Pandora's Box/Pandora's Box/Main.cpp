@@ -2,7 +2,10 @@
 #include <future>
 #include <chrono>
 #include <iostream>
+#include <sstream>
 #include <iomanip>
+#include <atomic>
+#include <condition_variable>
 #include <mutex>
 #include "UDPClient.h"
 #include "MBCtoHostReader.h"
@@ -15,23 +18,30 @@
 int main()
 {
 	//Receiving Buffers
-	std::array<char, DirtRally::UDPPacketNoExtra::GetStructSizeinByte()> incomingbuffer{ 0 };
+	std::atomic<std::array<char, DirtRally::UDPPacketNoExtra::GetStructSizeinByte()>> incomingbuffer;
 
 
 
 	//TODO: Reading from .ini
-	UDPClient client("10.20.24.139", 10991);
+	//"192.168.21.3", 10991
+	UDPClient client("192.168.21.3", 10991);
 	std::chrono::high_resolution_clock timer;
 	DataManager::PlatformDataManager datamanager;
 	DataManager::MBCtoHostReader reader;
-	datamanager.SetDataMode(DataManager::DataMode_DOF);
+	//datamanager.SetDataMode(DataManager::DataMode_DOF);
 	std::mutex mut;
+	std::condition_variable cv;
 	uint64_t packetSent = 0;
-	bool incomingBufferChanged = false;
-	bool statusBufferChanged = false;
+	std::atomic<bool> incomingBufferChanged = false;
+	std::atomic<bool> statusBufferChanged = false;
 
-	bool networkSwitch = true;
-	bool programRun = true;
+	std::atomic<bool> networkSwitch = true;
+	std::atomic<bool> isProgramRunning = true;
+
+
+	std::atomic<bool> shouldSend = false;
+	std::atomic<bool> shouldRecvGameData = false;
+	std::atomic<bool> shouldRecvStatus = false;
 	auto programBeginTime = timer.now();
 
 	//Platform related data
@@ -39,33 +49,20 @@ int main()
 	size_t platformBufferSize = datamanager.GetDataSize();
 
 
-	//Platform boot up sequences
-	//1. Sending engage message
-	datamanager.SetCommandState(DataManager::CommandState_ENGAGE);
-	datamanager.SyncBufferChanges();
-	auto result = client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-	if (result == SOCKET_ERROR)
-	{
-		wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
-	}
-
-	//2. Wait for Engaged message 
-	while (-1 != client.ReceiveFromRemote(reinterpret_cast<char *>(reader.GetBufferAdder()), reader.ReaderDataBufferSize))
-	{
-		if (DataManager::MachineState::MS_Engaged == reader.GetStatusResponse()->GetMachineState())
-		{
-			break;
-		}
-	}
-
 
 
 	auto SendingToPlatform = [&]()
 	{
+
+
 		using namespace std::chrono_literals;
-		auto delay = 500us;
-		while (programRun)
+		auto delay = 450us;
+		while (isProgramRunning)
 		{
+			std::unique_lock<std::mutex> lk(mut);
+			cv.wait(lk, [&] {return shouldSend.load(); });
+			lk.unlock();
+
 			if (networkSwitch)
 			{
 				static auto lastTimeStamp = timer.now();
@@ -86,11 +83,7 @@ int main()
 						}
 
 						auto result = client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-						if (result == SOCKET_ERROR)
-						{
-							wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
-						}
-						else
+						if (result != SOCKET_ERROR)
 						{
 							++packetSent;
 						}
@@ -98,15 +91,16 @@ int main()
 					}
 					lastTimeStamp += delay;
 				}
+
 				auto timelapsed = (double)std::chrono::duration_cast<std::chrono::seconds>(timer.now() - programBeginTime).count();
 				auto sendingRate = (double)packetSent / timelapsed;
-				std::cout << "\r  Packet Sent Rate: " << sendingRate;
-				if (sendingRate <= 2000)
+				if (sendingRate <= 2200)
 				{
 					if (delay > 0us)
 					{
 						delay -= 10us;
 					}
+
 				}
 				else
 				{
@@ -114,8 +108,9 @@ int main()
 				}
 
 
-
-
+				std::ostringstream os;
+				os << "\rPacket Sent Rate: " << sendingRate;
+				std::cout << os.str();
 			}
 
 		}
@@ -124,17 +119,17 @@ int main()
 	auto StatusFromPlatform = [&]()
 	{
 
-		while (programRun)
+		while (isProgramRunning)
 		{
+			std::unique_lock<std::mutex> lk(mut);
+			cv.wait(lk, [&] {return shouldRecvStatus.load(); });
+			lk.unlock();
+
 			if (networkSwitch)
 			{
 				if (-1 != client.ReceiveFromRemote(reinterpret_cast<char *>(reader.GetBufferAdder()), reader.ReaderDataBufferSize))
 				{
-					if (mut.try_lock())
-					{
-						statusBufferChanged = true;
-						mut.unlock();
-					}
+					statusBufferChanged = true;
 				}
 			}
 		}
@@ -143,17 +138,17 @@ int main()
 
 	auto DataFromDirt = [&]()
 	{
-		while (programRun)
+		while (isProgramRunning)
 		{
+			std::unique_lock<std::mutex> lk(mut);
+			cv.wait(lk, [&] {return shouldRecvGameData.load(); });
+			lk.unlock();
+
 			if (networkSwitch)
 			{
-				if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(incomingbuffer.data()), incomingbuffer.size()))
+				if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(incomingbuffer.load().data()), incomingbuffer.load().size()))
 				{
-					if (mut.try_lock())
-					{
-						incomingBufferChanged = true;
-						mut.unlock();
-					}
+					incomingBufferChanged = true;
 				}
 			}
 		}
@@ -163,20 +158,18 @@ int main()
 	{
 		if (incomingBufferChanged)
 		{
+			incomingBufferChanged = false;
 			if (mut.try_lock())
 			{
-				incomingBufferChanged = false;
 				//No need to convert endianness
 				DirtRally::UDPPacketNoExtra packet;
-				memcpy(&packet, incomingbuffer.data(), sizeof(packet));
+				memcpy(&packet, incomingbuffer.load().data(), sizeof(packet));
 				// Converting to platform data struct
 				datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
-
 				datamanager.SetDofData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
 				datamanager.SyncBufferChanges();
 				platformBufferSize = datamanager.GetDataSize();
 				mut.unlock();
-
 			}
 		}
 
@@ -194,53 +187,116 @@ int main()
 	asyncTasks[RecvStatus] = std::async(std::launch::async, StatusFromPlatform);
 
 
+	auto PlatformBootUp = [&]()
+	{
+		//Disable spamming thread
+		std::cout << "Paused\n";
+		shouldSend = false;
+		//Send two reset packets with the same sequence number
+		datamanager.SetCommandState(DataManager::CommandState_RESET);
+		datamanager.SyncBufferChanges();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		datamanager.IncrimentPacketSequence();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		//Send one engage packet
+		datamanager.SetCommandState(DataManager::CommandState_ENGAGE);
+		datamanager.SetPacketSequence(1);
+		datamanager.SyncBufferChanges();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		shouldSend = true;
+		cv.notify_all();
+		std::cout << "Resumed\n";
+
+	};
 
 
 	programBeginTime = timer.now();
-	while (programRun)
+	bool wasKeyPressed[5]{ false };
+	bool isKeyPressed[5]{ false };
+
+	PlatformBootUp();
+	while (isProgramRunning)
 	{
-		if (GetAsyncKeyState('P'))
-		{
-			mut.lock();
-			networkSwitch = !networkSwitch;
-			mut.unlock();
-		}
 
 		if (GetAsyncKeyState(VK_ESCAPE))
 		{
-			mut.lock();
-			programRun = !programRun;
-			mut.unlock();
+			isProgramRunning = !isProgramRunning;
+			//std::cout << "Program Ends!\n";
+			break;
 		}
 
+		uint8_t index = 0;
 
+		isKeyPressed[index] = GetAsyncKeyState('G');
+		if (isKeyPressed[index] && !wasKeyPressed[index])
+		{
+			PlatformBootUp();
+		}
+		wasKeyPressed[index] = isKeyPressed[index];
+		++index;
+
+
+		isKeyPressed[index] = GetAsyncKeyState('P');
+		if (isKeyPressed[index] && !wasKeyPressed[index])
+		{
+			networkSwitch = !networkSwitch;
+			std::cout << (networkSwitch ? "\nNetwork On!\n" : "\nNetwork Off!\n");
+		}
+		wasKeyPressed[index] = isKeyPressed[index];
+		++index;
+
+
+		isKeyPressed[index] = GetAsyncKeyState('L');
+		if (isKeyPressed[index] && !wasKeyPressed[index])
+		{
+			shouldSend = !shouldSend;
+			cv.notify_all();
+		}
+		wasKeyPressed[index] = isKeyPressed[index];
+		++index;
+
+		isKeyPressed[index] = GetAsyncKeyState('K');
+		if (isKeyPressed[index] && !wasKeyPressed[index])
+		{
+			shouldRecvGameData = !shouldRecvGameData;
+			cv.notify_all();
+		}
+		wasKeyPressed[index] = isKeyPressed[index];
+		++index;
+
+		isKeyPressed[index] = GetAsyncKeyState('J');
+		if (isKeyPressed[index] && !wasKeyPressed[index])
+		{
+			shouldRecvStatus = !shouldRecvStatus;
+			cv.notify_all();
+		}
+		wasKeyPressed[index] = isKeyPressed[index];
 
 		parseDirtPacket();
-
-
-
-
-
 	}
 
 
 
-
-	//Finishing up
-	/*auto timelapsed = (double)std::chrono::duration_cast<std::chrono::seconds>(timer.now() - programBeginTime).count();
-	std::cout << "Packet Sent Rate: " << (double)packetSent / timelapsed << "\n";*/
-
-
-	//Send disengage message to platform
-
-	//shutdown sockets
-	client.Shutdown();
-	//Join all other threads
-	for (auto& task : asyncTasks)
+	//Shutdown block
 	{
-		task.get();
-	}
+		//Shutdown Platform
+		datamanager.SetCommandState(DataManager::CommandState_DISENGAGE);
+		datamanager.IncrimentPacketSequence();
+		datamanager.SyncBufferChanges();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		datamanager.SetCommandState(DataManager::CommandState_RESET);
+		datamanager.IncrimentPacketSequence();
+		datamanager.SyncBufferChanges();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
 
+		//Shutdown sockets
+		client.Shutdown();
+		//Join all other threads
+		for (auto& task : asyncTasks)
+		{
+			task.get();
+		}
+	}
 	return 0;
 
 }
