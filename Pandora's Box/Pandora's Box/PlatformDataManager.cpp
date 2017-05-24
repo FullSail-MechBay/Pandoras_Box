@@ -98,7 +98,7 @@ void PlatformDataManager::Data_Dof::Initialize(DataModes _dataMode)
 	Yaw = 0;
 	Surge = 0;
 	Sway = 0;
-	Heave = 0;
+	Heave = -0.15f;
 
 	SpecialEffects = SFX_NO_EFFECT;
 }
@@ -106,12 +106,12 @@ void PlatformDataManager::Data_Length::Initialize(DataModes _dataMode)
 {
 	PostHeader::Initialize(_dataMode);
 
-	ActuatorLength_A = 0;
-	ActuatorLength_B = 0;
-	ActuatorLength_C = 0;
-	ActuatorLength_D = 0;
-	ActuatorLength_E = 0;
-	ActuatorLength_F = 0;
+	ActuatorLength_A = 0.2f;
+	ActuatorLength_B = 0.2f;
+	ActuatorLength_C = 0.2f;
+	ActuatorLength_D = 0.2f;
+	ActuatorLength_E = 0.2f;
+	ActuatorLength_F = 0.2f;
 	SpecialEffects = SFX_NO_EFFECT;
 }
 void PlatformDataManager::Data_MotionCue::Initialize(DataModes _dataMode)

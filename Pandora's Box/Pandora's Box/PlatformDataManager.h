@@ -49,7 +49,7 @@ namespace DataManager
 
 	enum FeedBackFreq
 	{
-		Freq_Dof = 1000,
+		Freq_Dof = 2000,
 		Freq_Length = 2000,
 		Freq_MotionCue = 60,
 		Freq_PlayBack = 0
@@ -142,9 +142,9 @@ namespace DataManager
 			float Acceleration_Roll;	// Rad/Sec^2
 			float Acceleration_Pitch;	// Rad/Sec^2
 			float Acceleration_Yaw;		// Rad/Sec^2
-			float Acceleration_Surge;	// Rad/Sec^2
-			float Acceleration_Sway;	// Rad/Sec^2
-			float Acceleration_Heave;	// Rad/Sec^2
+			float Acceleration_Surge;	// m/Sec^2
+			float Acceleration_Sway;	// m/Sec^2
+			float Acceleration_Heave;	// m/Sec^2
 			uint32_t SpecialEffects;
 
 			void Initialize(DataModes _dataMode);
@@ -356,9 +356,27 @@ namespace DataManager
 		// Return Value: 0: Success, 1: Same Mode(No Change), 2: Failed
 		// Requires SyncBufferChanges() to be called in order for changes to take effect.
 		uint8_t SetMotionCueData(
-			float _angelRoll, float _angelPitch, float _angelYaw, 
+			float _angelRoll, float _angelPitch, float _angelYaw,
 			float _velocityRoll, float _velocityPitch, float _velocityYaw,
 			float _accelRoll, float _accelPitch, float _accelYaw, float _accelSurge, float _accelSway, float _accelHeave);
+
+
+		inline int GetCurrentDataRate()
+		{
+			switch (CurrMode)
+			{
+			case DataManager::DataMode_DOF:
+				return Freq_Dof;
+			case DataManager::DataMode_Length:
+				return Freq_Length;
+			case DataManager::DataMode_Motion:
+				return Freq_MotionCue;
+			case DataManager::DataMode_PlayBack:
+				return Freq_PlayBack;
+			default:
+				return 0;
+			}
+		}
 
 		// TODO: Add functions to add, set, & remove special effects
 
