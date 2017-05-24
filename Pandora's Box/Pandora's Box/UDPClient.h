@@ -11,6 +11,7 @@ public:
 	int Send(const char* buffer, size_t bufferSize);
 	int ReceiveFromLocal(char* buffer, size_t bufferSize);
 	int ReceiveFromRemote(char* buffer, size_t bufferSize);
+	inline uint64_t PacketSent() const { return packetSent; }
 	void Shutdown();
 	~UDPClient();
 private:
@@ -18,5 +19,6 @@ private:
 	SOCKET outgoingSocket;
 	sockaddr_in outgoingAddress;
 	sockaddr_in receivingAddress;
+	uint64_t packetSent;
 };
 

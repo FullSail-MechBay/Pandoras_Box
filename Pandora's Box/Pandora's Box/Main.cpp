@@ -1,10 +1,7 @@
 #include <array>
 #include <future>
 #include <chrono>
-#include <algorithm>
-#include <iostream>
-//#include <sstream>
-//#include <iomanip>
+//#include <iostream>
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -22,7 +19,8 @@ int main()
 {
 	//Consts
 	const auto DEFAULT_DATA_MODE = DataManager::DataMode_DOF;
-
+	const auto DEFAULT_REMOTE_IP = "192.168.21.3";
+	const auto DEFAULT_REMOTE_PORT = 10991;
 
 	//Variables
 	std::chrono::high_resolution_clock timer;
@@ -33,11 +31,13 @@ int main()
 
 
 
-	UDPClient client("192.168.21.3", 10991);
-	uint64_t packetSent = 0;
+	UDPClient client(DEFAULT_REMOTE_IP, DEFAULT_REMOTE_PORT);
 	DataManager::PlatformDataManager datamanager;
-	datamanager.SetDataMode(DEFAULT_DATA_MODE);
 	DataManager::MBCtoHostReader reader;
+
+
+
+	datamanager.SetDataMode(DEFAULT_DATA_MODE);
 
 	std::atomic<bool> resetPlatform = true;
 	std::atomic<bool> networkSwitch = true;
@@ -59,36 +59,33 @@ int main()
 	{
 		while (isProgramRunning)
 		{
-
-			if (resetPlatform)
-			{
-				datamanager.SetCommandState(DataManager::CommandState_RESET);
-				datamanager.SyncBufferChanges();
-				client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-				datamanager.IncrimentPacketSequence();
-				client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-				datamanager.SetCommandState(DataManager::CommandState_ENGAGE);
-				datamanager.SetPacketSequence(1);
-				datamanager.SyncBufferChanges();
-				client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-				datamanager.IncrimentPacketSequence();
-				client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-				datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
-				datamanager.SyncBufferChanges();
-				resetPlatform = false;
-			}
-
-
-
 			if (networkSwitch)
 			{
 				if (mut.try_lock())
 				{
+
+					if (resetPlatform)
+					{
+						datamanager.SetCommandState(DataManager::CommandState_RESET);
+						datamanager.SyncBufferChanges();
+						client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+						datamanager.IncrimentPacketSequence();
+						client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+						datamanager.SetCommandState(DataManager::CommandState_ENGAGE);
+						datamanager.SetPacketSequence(1);
+						datamanager.SyncBufferChanges();
+						client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+						datamanager.IncrimentPacketSequence();
+						client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+						datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
+						datamanager.SyncBufferChanges();
+						resetPlatform = false;
+					}
+
 					datamanager.IncrimentPacketSequence();
 					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
 					datamanager.IncrimentPacketSequence();
 					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-					++packetSent;
 					mut.unlock();
 					std::this_thread::sleep_for(std::chrono::microseconds(1000000 / datamanager.GetCurrentDataRate()));
 				}
@@ -137,7 +134,7 @@ int main()
 					auto curframeTP = std::chrono::duration_cast<std::chrono::seconds>(timer.now() - lastframeTP).count();
 					if (curframeTP >= 1)
 					{
-						std::cout << (float)packGained / (float)curframeTP << "\n";
+						//std::cout << (float)packGained / (float)curframeTP << "\n";
 						packGained = 0;
 						lastframeTP = timer.now();
 					}

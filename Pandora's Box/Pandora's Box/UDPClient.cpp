@@ -3,7 +3,7 @@
 
 
 
-UDPClient::UDPClient(const char*  targetIP, int32_t targetPort)
+UDPClient::UDPClient(const char*  targetIP, int32_t targetPort) : packetSent(0)
 {
 	int ret = 0;
 	WSADATA data;
@@ -29,6 +29,7 @@ UDPClient::UDPClient(const char*  targetIP, int32_t targetPort)
 }
 int UDPClient::Send(const char* buffer, size_t bufferSize)
 {
+	packetSent++;
 	return sendto(outgoingSocket, buffer, static_cast<int>(bufferSize), 0, (sockaddr*)&outgoingAddress, sizeof(sockaddr_in));
 }
 
@@ -51,5 +52,5 @@ void UDPClient::Shutdown()
 
 UDPClient::~UDPClient()
 {
-	
+
 }
