@@ -36,6 +36,21 @@ namespace DataManager
 		MS_Frozen = 13			// System is Engaged, but motion is currently frozen.
 	};
 
+	const char* MachineStateString[]
+	{
+		"MS_Initializing",
+		"MS_Ready",
+		"MS_StandBy",
+		"MS_Engaged",
+		"MS_Parking",
+		"MS_Fault_1",
+		"MS_Fault_2",
+		"MS_Fault_2_Hold",
+		"MS_Disabled",
+		"MS_Inhibited",
+		"MS_Frozen",
+	};
+
 	enum MotionCommandMode
 	{
 		MCM_Local,			

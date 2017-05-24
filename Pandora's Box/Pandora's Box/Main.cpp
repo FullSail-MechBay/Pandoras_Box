@@ -1,7 +1,7 @@
 #include <array>
 #include <future>
 #include <chrono>
-//#include <iostream>
+#include <iostream>
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -12,15 +12,24 @@
 #include "PlatformDataManager.h"
 
 
+//Helper constant expressions 
+constexpr int GetWaitTimeinMills(int hz)
+{
+	return 1000 / hz;
+}
+
+
+using ThreadSafeBool = std::atomic<bool>;
 
 //TODO: Reading setting from file
 //"192.168.21.3", 10991
 int main()
 {
-	//Consts
-	const auto DEFAULT_DATA_MODE = DataManager::DataMode_DOF;
+	//Constants
+	const auto DEFAULT_DATA_MODE = DataManager::DataMode_Motion;
 	const auto DEFAULT_REMOTE_IP = "192.168.21.3";
-	const auto DEFAULT_REMOTE_PORT = 10991;
+	const int DEFAULT_REMOTE_PORT = 10991;
+	const int GAME_DATATICKRATE = 60;
 
 	//Variables
 	std::chrono::high_resolution_clock timer;
@@ -39,15 +48,14 @@ int main()
 
 	datamanager.SetDataMode(DEFAULT_DATA_MODE);
 
-	std::atomic<bool> resetPlatform = true;
-	std::atomic<bool> networkSwitch = true;
-	std::atomic<bool> isProgramRunning = true;
 
-	std::atomic<bool> incomingBufferChanged = false;
-	std::atomic<bool> statusBufferChanged = false;
-	std::atomic<bool> shouldSend = false;
-	std::atomic<bool> shouldRecvGameData = false;
-	std::atomic<bool> shouldRecvStatus = false;
+	ThreadSafeBool resetPlatform = true;
+	ThreadSafeBool isProgramRunning = true;
+	ThreadSafeBool incomingBufferChanged = false;
+	ThreadSafeBool statusBufferChanged = false;
+	ThreadSafeBool shouldSend = false;
+	ThreadSafeBool shouldRecvGameData = false;
+	ThreadSafeBool shouldRecvStatus = true;
 
 	//Platform related data
 	const char* platformBufferPtr = reinterpret_cast<const char *>(datamanager.GetDataBufferAddress());
@@ -59,37 +67,37 @@ int main()
 	{
 		while (isProgramRunning)
 		{
-			if (networkSwitch)
+			std::unique_lock<std::mutex> lk(mut);
+			cv.wait(lk, [&] {return shouldSend.load(); });
+			lk.unlock();
+
+			if (mut.try_lock())
 			{
-				if (mut.try_lock())
+
+				if (resetPlatform)
 				{
-
-					if (resetPlatform)
-					{
-						datamanager.SetCommandState(DataManager::CommandState_RESET);
-						datamanager.SyncBufferChanges();
-						client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-						datamanager.IncrimentPacketSequence();
-						client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-						datamanager.SetCommandState(DataManager::CommandState_ENGAGE);
-						datamanager.SetPacketSequence(1);
-						datamanager.SyncBufferChanges();
-						client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-						datamanager.IncrimentPacketSequence();
-						client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-						datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
-						datamanager.SyncBufferChanges();
-						resetPlatform = false;
-					}
-
-					datamanager.IncrimentPacketSequence();
+					datamanager.SetCommandState(DataManager::CommandState_RESET);
+					datamanager.SyncBufferChanges();
 					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
 					datamanager.IncrimentPacketSequence();
 					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-					mut.unlock();
-					std::this_thread::sleep_for(std::chrono::microseconds(1000000 / datamanager.GetCurrentDataRate()));
+					datamanager.SetCommandState(DataManager::CommandState_ENGAGE);
+					datamanager.SetPacketSequence(1);
+					datamanager.SyncBufferChanges();
+					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+					datamanager.IncrimentPacketSequence();
+					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+					datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
+					datamanager.SyncBufferChanges();
+					resetPlatform = false;
 				}
 
+				datamanager.IncrimentPacketSequence();
+				client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+				datamanager.IncrimentPacketSequence();
+				client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+				mut.unlock();
+				std::this_thread::sleep_for(std::chrono::microseconds(1000000 / datamanager.GetCurrentDataRate()));
 			}
 
 		}
@@ -103,13 +111,17 @@ int main()
 			std::unique_lock<std::mutex> lk(mut);
 			cv.wait(lk, [&] {return shouldRecvStatus.load(); });
 			lk.unlock();
-
-			if (networkSwitch)
+			if (-1 != client.ReceiveFromRemote(reinterpret_cast<char *>(reader.GetBufferAdder()), reader.ReaderDataBufferSize))
 			{
-				if (-1 != client.ReceiveFromRemote(reinterpret_cast<char *>(reader.GetBufferAdder()), reader.ReaderDataBufferSize))
+				statusBufferChanged = true;
+				auto response = reader.GetStatusResponse();
+				static auto lastMachineState = response->GetMachineState();
+				if (response->GetMachineState() != lastMachineState)
 				{
-					statusBufferChanged = true;
+					lastMachineState = response->GetMachineState();
+					std::cout << "Current Machine State: " << DataManager::MachineStateString[lastMachineState] << "\n";
 				}
+
 			}
 		}
 
@@ -124,83 +136,103 @@ int main()
 			lk.unlock();
 			static auto lastframeTP = timer.now();
 			static int64_t packGained = 0;
-			if (networkSwitch)
+			if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(incomingbuffer.load().data()), incomingbuffer.load().size()))
 			{
-				if (-1 != client.ReceiveFromLocal(reinterpret_cast<char *>(incomingbuffer.load().data()), incomingbuffer.load().size()))
+				incomingBufferChanged = true;
+				packGained++;
+
+				auto curframeTP = std::chrono::duration_cast<std::chrono::seconds>(timer.now() - lastframeTP).count();
+				if (curframeTP >= 1)
 				{
-					incomingBufferChanged = true;
-					packGained++;
-
-					auto curframeTP = std::chrono::duration_cast<std::chrono::seconds>(timer.now() - lastframeTP).count();
-					if (curframeTP >= 1)
-					{
-						//std::cout << (float)packGained / (float)curframeTP << "\n";
-						packGained = 0;
-						lastframeTP = timer.now();
-					}
-
-
+					//std::cout << (float)packGained / (float)curframeTP << "\n";
+					packGained = 0;
+					lastframeTP = timer.now();
 				}
+
+
+			}
+
+		}
+	};
+
+	auto parseGameDataMotionCue = [&]()
+	{
+		if (incomingBufferChanged)
+		{
+			incomingBufferChanged = false;
+			if (mut.try_lock())
+			{
+				//No need to convert endianness
+				DirtRally::UDPPacketNoExtra packet;
+				memcpy(&packet, incomingbuffer.load().data(), sizeof(packet));
+				// Converting to platform data struct
+				datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
+				//	Dirt:Rally 
+				//	X and Y axes are on the ground, Z is up
+				//	Heading	anticlockwise from above (Z)
+				//	Pitch	anticlockwise from right (X)
+				//	Roll	anticlockwise from front (Y)
+				//	Motion Platform:
+				//	X = Forward
+				//	Y = Right Wing
+				//	Z = Down
+				//	Roll about X
+				//	Pitch about Y
+				//	Yaw about Z
+				datamanager.SetMotionCueData
+				(	packet.m_roll, packet.m_pitch, packet.m_heading,
+					packet.m_angvely, packet.m_angvelx, packet.m_angvelz,
+					packet.m_accely, packet.m_accelx, packet.m_accelz,
+					packet.m_vely, packet.m_velx, packet.m_velz
+					);
+				datamanager.SyncBufferChanges();
+				platformBufferSize = datamanager.GetDataSize();
+				mut.unlock();
 			}
 		}
-	};
 
-	auto parseDirtPacket = [&]()
-	{
-		//if (incomingBufferChanged)
-		//{
-		//	incomingBufferChanged = false;
-		//	if (mut.try_lock())
+		//{ // Testing 
+		//	static float heave = -0.1f;
+		//	static float step = 0.00002f;
+		//	heave -= step;
+		//	if (heave <= -0.3f || heave >= -0.1f)
 		//	{
-		//		//No need to convert endianness
-		//		DirtRally::UDPPacketNoExtra packet;
-		//		memcpy(&packet, incomingbuffer.load().data(), sizeof(packet));
-		//		// Converting to platform data struct
-		//		datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
-		//		datamanager.SetDofData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-		//		datamanager.SyncBufferChanges();
-		//		platformBufferSize = datamanager.GetDataSize();
-		//		mut.unlock();
+		//		step *= -1.0f;
 		//	}
+
+		//	//std::cout << heave << "\n";
+		//	datamanager.SetDofData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, heave);
+		//	datamanager.SyncBufferChanges();
+		//	platformBufferSize = datamanager.GetDataSize();
 		//}
-
-		static float heave = -0.1f;
-		static float step = 0.00002f;
-		heave -= step;
-		if (heave <= -0.3f || heave >= -0.1f)
-		{
-			step *= -1.0f;
-		}
-
-		//std::cout << heave << "\n";
-		datamanager.SetDofData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, heave);
-		datamanager.SyncBufferChanges();
-		platformBufferSize = datamanager.GetDataSize();
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(16));
+		std::this_thread::sleep_for(std::chrono::milliseconds(GetWaitTimeinMills(GAME_DATATICKRATE)));
 	};
 
-	std::array<std::shared_future<void>, 3> asyncTasks;
+
 	enum eTASK_NAME
 	{
 		Send = 0,
 		RecvGameData,
 		RecvStatus,
+		TASK_COUNT
 	};
+	std::array<std::shared_future<void>, TASK_COUNT> asyncTasks;
 	asyncTasks[RecvGameData] = std::async(std::launch::async, DataFromDirt);
 	asyncTasks[Send] = std::async(std::launch::async, SendingToPlatform);
 	asyncTasks[RecvStatus] = std::async(std::launch::async, StatusFromPlatform);
 
 
-	auto SignalPlatformToReset = [&resetPlatform]()
+	auto SignalPlatformToReset = [&shouldSend, &resetPlatform]()
 	{
 		resetPlatform = true;
+		shouldSend = true;
 	};
 
 
-	bool wasKeyPressed[5]{ false };
-	bool isKeyPressed[5]{ false };
-
+	const uint8_t NUM_BUFFERED_KEYS = 4;
+	bool wasKeyPressed[NUM_BUFFERED_KEYS]{ false };
+	bool isKeyPressed[NUM_BUFFERED_KEYS]{ false };
+	uint8_t i = 0;
 	SignalPlatformToReset();
 
 
@@ -213,54 +245,44 @@ int main()
 			break;
 		}
 
-		uint8_t index = 0;
 
-		isKeyPressed[index] = GetAsyncKeyState('G');
-		if (isKeyPressed[index] && !wasKeyPressed[index])
+		isKeyPressed[i] = GetAsyncKeyState('G');
+		if (isKeyPressed[i] && !wasKeyPressed[i])
 		{
 			SignalPlatformToReset();
 		}
-		wasKeyPressed[index] = isKeyPressed[index];
-		++index;
+		wasKeyPressed[i] = isKeyPressed[i];
+		++i;
 
 
-		isKeyPressed[index] = GetAsyncKeyState('P');
-		if (isKeyPressed[index] && !wasKeyPressed[index])
-		{
-			networkSwitch = !networkSwitch;
-			//std::cout << (networkSwitch ? "\nNetwork On!\n" : "\nNetwork Off!\n");
-		}
-		wasKeyPressed[index] = isKeyPressed[index];
-		++index;
-
-
-		isKeyPressed[index] = GetAsyncKeyState('L');
-		if (isKeyPressed[index] && !wasKeyPressed[index])
-		{
-			shouldSend = !shouldSend;
-			cv.notify_all();
-		}
-		wasKeyPressed[index] = isKeyPressed[index];
-		++index;
-
-		isKeyPressed[index] = GetAsyncKeyState('K');
-		if (isKeyPressed[index] && !wasKeyPressed[index])
+		isKeyPressed[i] = GetAsyncKeyState('H');
+		if (isKeyPressed[i] && !wasKeyPressed[i])
 		{
 			shouldRecvGameData = !shouldRecvGameData;
 			cv.notify_all();
 		}
-		wasKeyPressed[index] = isKeyPressed[index];
-		++index;
+		wasKeyPressed[i] = isKeyPressed[i];
+		++i;
 
-		isKeyPressed[index] = GetAsyncKeyState('J');
-		if (isKeyPressed[index] && !wasKeyPressed[index])
+		isKeyPressed[i] = GetAsyncKeyState('K');
+		if (isKeyPressed[i] && !wasKeyPressed[i])
+		{
+			shouldRecvGameData = !shouldRecvGameData;
+			cv.notify_all();
+		}
+		wasKeyPressed[i] = isKeyPressed[i];
+		++i;
+
+		isKeyPressed[i] = GetAsyncKeyState('J');
+		if (isKeyPressed[i] && !wasKeyPressed[i])
 		{
 			shouldRecvStatus = !shouldRecvStatus;
 			cv.notify_all();
 		}
-		wasKeyPressed[index] = isKeyPressed[index];
+		wasKeyPressed[i] = isKeyPressed[i];
+		i = 0;
 
-		parseDirtPacket();
+		parseGameDataMotionCue();
 	}
 
 
