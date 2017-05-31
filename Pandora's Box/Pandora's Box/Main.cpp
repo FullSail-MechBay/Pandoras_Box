@@ -21,6 +21,22 @@ constexpr int GetWaitTimeinMills(int hz)
 
 using ThreadSafeBool = std::atomic<bool>;
 
+
+
+
+//	Dirt:Rally 
+//	X and Y axes are on the ground, Z is up
+//	Heading	anticlockwise from above (Z)
+//	Pitch	anticlockwise from right (X)
+//	Roll	anticlockwise from front (Y)
+//	Motion Platform:
+//	X = Forward
+//	Y = Right Wing
+//	Z = Down
+//	Roll about X
+//	Pitch about Y
+//	Yaw about Z
+
 //TODO: Reading setting from file
 //"192.168.21.3", 10991
 int main()
@@ -166,7 +182,6 @@ int main()
 				DirtRally::UDPPacketNoExtra packet;
 				memcpy(&packet, incomingbuffer.load().data(), sizeof(packet));
 				// Converting to platform data struct
-				datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
 				//	Dirt:Rally 
 				//	X and Y axes are on the ground, Z is up
 				//	Heading	anticlockwise from above (Z)
