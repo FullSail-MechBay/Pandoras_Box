@@ -49,7 +49,7 @@ namespace DataManager
 
 	enum FeedBackFreq
 	{
-		Freq_Dof = 2000,
+		Freq_Dof = 1000,
 		Freq_Length = 2000,
 		Freq_MotionCue = 60,
 		Freq_PlayBack = 0
