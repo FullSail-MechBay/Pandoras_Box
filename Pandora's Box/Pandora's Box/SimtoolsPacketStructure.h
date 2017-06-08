@@ -9,11 +9,11 @@ namespace Simtools
 			return sizeof(DOFPacket);
 		}
 
-		int16_t		m_roll;
-		int16_t		m_pitch;
-		int16_t		m_heave;
-		int16_t		m_yaw;
-		int16_t		m_sway;
-		int16_t		m_surge;
+		uint16_t		m_roll;
+		uint16_t		m_pitch;
+		uint16_t		m_heave;
+		uint16_t		m_yaw;
+		uint16_t		m_sway;
+		uint16_t		m_surge;
 	};
 }

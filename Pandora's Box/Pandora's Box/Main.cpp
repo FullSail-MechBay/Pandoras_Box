@@ -1,6 +1,7 @@
 #include <array>
 #include <future>
 #include <chrono>
+#include <ctime>
 #include <iostream>
 #include <atomic>
 #include <condition_variable>
@@ -29,7 +30,10 @@ constexpr int GetWaitTimeinMills(int hz)
 
 using ThreadSafeBool = std::atomic<bool>;
 
-
+inline double interpolate(double start, double end, double coefficient)
+{
+	return start + coefficient * (end - start);
+}
 
 
 
@@ -43,17 +47,19 @@ int main()
 	const auto DEFAULT_REMOTE_IP = "192.168.21.3";
 	const int DEFAULT_REMOTE_PORT = 10991;
 	const int GAME_DATATICKRATE = 1000;
+	const int TICKRATE = 500;
 
 	//Variables
 	std::chrono::high_resolution_clock timer;
 	std::mutex mut;
 	std::condition_variable cv;
 	CSignalGenerator generator;
-	generator.SetParameters(CSignalGenerator::eWAVEFORM_SINE, 0.025, 1, 0.0, 3000);
+	generator.SetParameters(CSignalGenerator::eWAVEFORM_SINE, 0.5, 0.1, 0.0, GAME_DATATICKRATE);
 
 	//Receiving Buffers
 	std::array<char, DirtRally::UDPPacketNoExtra::GetStructSizeinByte()> incomingbuffer;
-
+	std::array<Simtools::DOFPacket, TICKRATE> packetStack;
+	ZeroMemory(packetStack.data(), packetStack.size() * Simtools::DOFPacket::GetStructSizeinByte());
 
 
 	UDPClient client(DEFAULT_REMOTE_IP, DEFAULT_REMOTE_PORT);
@@ -77,7 +83,19 @@ int main()
 	const char* platformBufferPtr = reinterpret_cast<const char *>(datamanager.GetDataBufferAddress());
 	size_t platformBufferSize = datamanager.GetDataSize();
 
+	auto SinYaw = [&datamanager, &platformBufferSize, &generator, &timer]()
+	{
 
+		float yaw = generator.GetSample();
+
+
+		//yaw = map(static_cast<float>(yaw), -1.0f, 1.0f, -0.3f, 0.3f);
+		//std::cout << "TimeStamp: " <<(timer.now().time_since_epoch().count()/1000000) << "\t" << yaw << "\n";
+		datamanager.SetDofData(0.0f, 0.0f, yaw, 0.0f, 0.0f, -0.12f);
+		datamanager.SyncBufferChanges();
+		platformBufferSize = datamanager.GetDataSize();
+		//std::this_thread::sleep_for(std::chrono::microseconds(500));
+	};
 
 	auto SendingToPlatform = [&]()
 	{
@@ -87,35 +105,28 @@ int main()
 			cv.wait(lk, [&] {return shouldSend.load(); });
 			lk.unlock();
 
-			if (mut.try_lock())
-			{
 
-				if (resetPlatform)
+
+			if (resetPlatform)
+			{
+				if (mut.try_lock())
 				{
 					datamanager.SetCommandState(DataManager::CommandState_RESET);
 					datamanager.SyncBufferChanges();
-					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-					datamanager.IncrimentPacketSequence();
 					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
 					datamanager.SetCommandState(DataManager::CommandState_ENGAGE);
 					datamanager.SetPacketSequence(1);
 					datamanager.SyncBufferChanges();
 					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-					datamanager.IncrimentPacketSequence();
-					client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
 					datamanager.SetCommandState(DataManager::CommandState_NO_CHANGE);
 					datamanager.SyncBufferChanges();
 					resetPlatform = false;
+					mut.unlock();
 				}
-
-				datamanager.IncrimentPacketSequence();
-				client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-				datamanager.IncrimentPacketSequence();
-				client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-				mut.unlock();
-				std::this_thread::sleep_for(std::chrono::microseconds(1000));
 			}
-
+			datamanager.IncrimentPacketSequence();
+			client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+			std::this_thread::sleep_for(std::chrono::microseconds(1));
 		}
 	};
 
@@ -129,6 +140,7 @@ int main()
 			lk.unlock();
 			if (-1 != client.ReceiveFromRemote(reinterpret_cast<char *>(reader.GetBufferAdder()), reader.ReaderDataBufferSize))
 			{
+				std::cout << "Received!";
 				statusBufferChanged = true;
 				auto response = reader.GetStatusResponse();
 				static auto lastMachineState = response->GetMachineState();
@@ -164,8 +176,10 @@ int main()
 				//	packGained = 0;
 				//	lastframeTP = timer.now();
 				//}
+				//std::this_thread::sleep_for(std::chrono::microseconds(500));
 			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(GetWaitTimeinMills(GAME_DATATICKRATE)));
+
+			//std::this_thread::sleep_for(std::chrono::milliseconds(GetWaitTimeinMills(GAME_DATATICKRATE)));
 		}
 	};
 
@@ -198,12 +212,13 @@ int main()
 					packet.m_angvely, packet.m_angvelx, packet.m_angvelz,
 					packet.m_accely, packet.m_accelx, packet.m_accelz,
 					packet.m_vely, packet.m_velx, packet.m_velz
-					);
-				std::cout << packet.m_roll << "\n";*/
-				//datamanager.SetDofData(packet.m_roll, packet.m_pitch, packet.m_heading, packet.m_y, packet.m_x, -packet.m_z);
-				datamanager.SetDofData(0.0f*packet.m_roll, 0.0f* packet.m_pitch, 0.0f, 10.0f*36.0f * packet.m_z, 0.0f, -0.15f);
-				std::cout.precision(50);
-				std::cout << std::fixed << packet.m_z << "\n";
+					);*/
+					//const double PI = 3.1415926535897932384626433832795;
+					//std::cout << 1.5708 - packet.m_roll << "\n";
+				datamanager.SetDofData(1.5708 - packet.m_roll, 0.0f, 0.0f, 0.0f, 0.0f, -0.12f);
+				//datamanager.SetDofData(0.0f*packet.m_roll, 0.0f* packet.m_pitch, 0.0f, 10.0f*36.0f * packet.m_z, 0.0f, -0.15f);
+				//std::cout.precision(50);
+				//std::cout << std::fixed << packet.m_z << "\n";
 				datamanager.SyncBufferChanges();
 				platformBufferSize = datamanager.GetDataSize();
 				mut.unlock();
@@ -224,10 +239,19 @@ int main()
 		//	datamanager.SyncBufferChanges();
 		//	platformBufferSize = datamanager.GetDataSize();
 		//}
-		std::this_thread::sleep_for(std::chrono::milliseconds(GetWaitTimeinMills(GAME_DATATICKRATE)));
+		//std::this_thread::sleep_for(std::chrono::milliseconds(GetWaitTimeinMills(GAME_DATATICKRATE)));
 	};
 
 
+
+	// Converting to platform data struct
+	//	Motion Platform:
+	//	X = Forward
+	//	Y = Right Wing
+	//	Z = Down
+	//	Roll about X
+	//	Pitch about Y
+	//	Yaw about Z
 	auto parseGameDataDOF = [&]()
 	{
 		if (incomingBufferChanged)
@@ -236,27 +260,44 @@ int main()
 			if (mut.try_lock())
 			{
 				//No need to convert endianness
+				static Simtools::DOFPacket lastpacket;
 				Simtools::DOFPacket packet;
-				ZeroMemory(&packet, sizeof packet);
-				memcpy(&packet, incomingbuffer.data(), sizeof(packet));
-				// Converting to platform data struct
-				//	Motion Platform:
-				//	X = Forward
-				//	Y = Right Wing
-				//	Z = Down
-				//	Roll about X
-				//	Pitch about Y
-				//	Yaw about Z
+				ZeroMemory(&packet, Simtools::DOFPacket::GetStructSizeinByte());
+				memcpy(&packet, incomingbuffer.data(), Simtools::DOFPacket::GetStructSizeinByte());
+				packet.m_heave = ntohs(packet.m_heave);
+				packet.m_pitch = ntohs(packet.m_pitch);
+				packet.m_roll = ntohs(packet.m_roll);
+				packet.m_surge = ntohs(packet.m_surge);
+				packet.m_sway = ntohs(packet.m_sway);
+				packet.m_yaw = ntohs(packet.m_yaw);
+
+				std::cout << packet.m_yaw << "\n";
+				static auto Lastframe = timer.now();
+				double deltaTime = (double)(timer.now() - Lastframe).count() / 1000000000.0*(double)TICKRATE;
+				double co = 0.0f;
+				for (size_t i = 0 ; i < packetStack.size(); i++)
+				{
+					packetStack[i].m_yaw = interpolate(lastpacket.m_yaw, packet.m_yaw, co);
+					co += deltaTime;
+					
+				}
+
+				
 				/*datamanager.SetDofData(0.0f*map(static_cast<float>(packet.m_roll), 0.0f, 255.f, -15.0f, 15.f),
 					0.0f* packet.m_pitch,
-					map(static_cast<float>(packet.m_yaw), 0.0f, 255.f, -0.383972f, 0.383972f),
+					map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), -0.3f, 0.3f),
 					0.0f*packet.m_surge,
 					0.0f*packet.m_sway,
 					-0.09f);*/
 				datamanager.SyncBufferChanges();
-				//std::cout << (float)packet.m_yaw << "\n";
-				std::cout << map(static_cast<float>(packet.m_yaw), -1.0f, 0.0f, -22.0f, 22.f) << "\n";
+
+				//std::cout << static_cast<float>(ntohs(packet.m_yaw)) << "\n";
+				//std::cout << map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), -0.3f, 0.3f) << "\n";
 				platformBufferSize = datamanager.GetDataSize();
+
+
+				Lastframe = timer.now();
+				lastpacket = packet;
 				mut.unlock();
 			}
 		}
@@ -264,19 +305,7 @@ int main()
 
 	};
 
-	auto SinYaw = [&datamanager, &platformBufferSize,&generator]()
-	{
 
-		float yaw = generator.GetSample();
-
-
-		yaw = map(static_cast<float>(yaw), -1.0f, 1.0f, -0.3f, 0.3f);
-		std::cout << yaw << "\n";
-		datamanager.SetDofData(0.0f, 0.0f, yaw, 0.0f, 0.0f, -0.12f);
-		datamanager.SyncBufferChanges();
-		platformBufferSize = datamanager.GetDataSize();
-		std::this_thread::sleep_for(std::chrono::microseconds(250));
-	};
 
 	enum eTASK_NAME
 	{
@@ -293,8 +322,8 @@ int main()
 
 	auto SignalPlatformToReset = [&shouldSend, &resetPlatform]()
 	{
-		resetPlatform = true;
-		shouldSend = true;
+		resetPlatform.store(true);
+		shouldSend.store(true);
 	};
 
 
@@ -352,8 +381,8 @@ int main()
 		i = 0;
 
 
-		SinYaw();
-		//parseGameDataDOF();
+		//SinYaw();
+		parseGameDataDOF();
 	}
 
 
@@ -365,16 +394,10 @@ int main()
 		datamanager.IncrimentPacketSequence();
 		datamanager.SyncBufferChanges();
 		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-		datamanager.IncrimentPacketSequence();
-		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
 		datamanager.SetCommandState(DataManager::CommandState_RESET);
 		datamanager.IncrimentPacketSequence();
 		datamanager.SyncBufferChanges();
 		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-		datamanager.IncrimentPacketSequence();
-		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-
-
 		//Shutdown sockets
 		client.Shutdown();
 		//Join all other threads

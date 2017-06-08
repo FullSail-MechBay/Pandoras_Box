@@ -21,7 +21,7 @@ UDPClient::UDPClient(const char*  targetIP, int32_t targetPort) : packetSent(0)
 	receivingAddress.sin_port = ntohs(20777);
 	receivingAddress.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
 	//Limit outgoingAddress to only receiving from this remoteHost
-	ret = connect(outgoingSocket, (SOCKADDR *)&outgoingAddress, sizeof(outgoingAddress));
+	//ret = connect(outgoingSocket, (SOCKADDR *)&outgoingAddress, sizeof(outgoingAddress));
 
 	ret = bind(receivingSocket, (SOCKADDR *)& receivingAddress, sizeof(receivingAddress));
 	//ret = connect(receivingSocket, (SOCKADDR *)&receivingAddress, sizeof(receivingAddress));
