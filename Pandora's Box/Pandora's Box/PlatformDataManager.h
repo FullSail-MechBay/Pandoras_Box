@@ -358,7 +358,8 @@ namespace DataManager
 		uint8_t SetMotionCueData(
 			float _angelRoll, float _angelPitch, float _angelYaw,
 			float _velocityRoll, float _velocityPitch, float _velocityYaw,
-			float _accelRoll, float _accelPitch, float _accelYaw, float _accelSurge, float _accelSway, float _accelHeave);
+			float _accelRoll, float _accelPitch, float _accelYaw, float _accelSurge, float _accelSway, float _accelHeave,
+			float _multiplier = 1.0f);
 
 
 		inline int GetCurrentDataRate()

@@ -278,7 +278,8 @@ uint8_t PlatformDataManager::SetLengthData(float _LenA, float _LenB, float _LenC
 uint8_t PlatformDataManager::SetMotionCueData(
 	float _angelRoll, float _angelPitch, float _angelYaw,
 	float _velocityRoll, float _velocityPitch, float _velocityYaw,
-	float _accelRoll, float _accelPitch, float _accelYaw, float _accelSurge, float _accelSway, float _accelHeave)
+	float _accelRoll, float _accelPitch, float _accelYaw, float _accelSurge, float _accelSway, float _accelHeave,
+	float _multiplier = 1.0f)
 {
 	if (2 != SetDataMode(DataMode_Motion))
 	{
