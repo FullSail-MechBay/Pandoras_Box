@@ -23,6 +23,7 @@ PlatformDataManager::PlatformDataManager()
 {
 	DataOutStep_ms = 0.0f;
 	DataDirty = true;
+	FirstPacket = true;
 	CurrMode = DataMode_DOF;
 	DataByteSize = 0;
 	DataBuffer = nullptr;
@@ -508,6 +509,13 @@ bool PlatformDataManager::Helper_CalculateFrameDiff(float _deltaT)
 
 	FramesDiff = _deltaT / (DataOutStep_ms == 0 ? FLT_EPSILON : DataOutStep_ms);
 	FrameSlicesRemaining = FramesDiff;
+	if (FirstPacket)
+	{
+		FrameSlicesRemaining = 0;
+		FramesDiff = 1.0f;
+		FirstPacket = false;
+	}
+
 	return true;
 }
 

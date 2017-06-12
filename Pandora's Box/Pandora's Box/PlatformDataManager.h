@@ -295,6 +295,7 @@ namespace DataManager
 		static uint32_t CurrPacketSequenceCount;
 		static uint32_t HeaderSize;
 		bool DataDirty;
+		bool FirstPacket;
 		int FrameSlicesRemaining;
 		float FramesDiff;
 
