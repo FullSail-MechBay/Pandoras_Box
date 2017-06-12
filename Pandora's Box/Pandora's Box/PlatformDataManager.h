@@ -7,6 +7,11 @@ namespace DataManager
 
 #pragma region Enums
 
+	enum Faults
+	{
+		Success, NoChange, Failed
+	};
+
 	enum DataModes
 	{
 		DataMode_DOF, DataMode_Length, DataMode_Motion, DataMode_PlayBack, DataMode_NumModes
@@ -290,11 +295,15 @@ namespace DataManager
 		static uint32_t CurrPacketSequenceCount;
 		static uint32_t HeaderSize;
 		bool DataDirty;
+		int FrameSlicesRemaining;
+		float FramesDiff;
 
 		DataModes		CurrMode;
 		uint32_t		DataByteSize;
 		uint8_t*		DataBuffer;
+		uint8_t*		NewestPacket;
 		uint8_t*		DataSwapBuffer;
+		uint8_t*		DataBufferDiff;
 		PostHeader*		DataModeHeaders[DataMode_NumModes];
 
 		SFXO_1_Direct_Displacement_DOF*		DataSFX01;
@@ -313,13 +322,15 @@ namespace DataManager
 		void Helper_SetUpDefualtData(DataModes _dataMode);
 		void SyncPacketSequence();
 		uint8_t DefaultOutBuffer(DataModes _dataMode);
+		bool Helper_CalculateFrameDiff(float _deltaT);
 
 #pragma endregion
-
 
 	public:
 		PlatformDataManager();
 		~PlatformDataManager();
+
+		float DataOutStep_ms;
 
 		// Packet Byte size
 		// !! Potentially Not thread safe while SyncBufferChange() is being called !!
@@ -338,6 +349,7 @@ namespace DataManager
 		// !! Not thread safe !!
 		// Swaps changes made to data packet into the buffer for data transfer
 		void SyncBufferChanges();
+		void IncDataFrame();
 
 		void SetCommandState(Command_State _commandState);
 		// IF _newMode != current mode it sets the buffer data to the default values for passed in data mode
@@ -349,10 +361,10 @@ namespace DataManager
 
 		// Return Value: 0: Success, 1: Same Mode(No Change), 2: Failed
 		// Requires SyncBufferChanges() to be called in order for changes to take effect.
-		uint8_t SetDofData(float _roll, float _pitch, float _yaw, float _surge, float _sway, float _heave);
+		uint8_t SetDofData(float _roll, float _pitch, float _yaw, float _surge, float _sway, float _heave, float _deltaT);
 		// Return Value: 0: Success, 1: Same Mode(No Change), 2: Failed
 		// Requires SyncBufferChanges() to be called in order for changes to take effect.
-		uint8_t SetLengthData(float _LenA, float _LenB, float _LenC, float _LenD, float _LenE, float _LenF);
+		uint8_t SetLengthData(float _LenA, float _LenB, float _LenC, float _LenD, float _LenE, float _LenF, float _deltaT);
 		// Return Value: 0: Success, 1: Same Mode(No Change), 2: Failed
 		// Requires SyncBufferChanges() to be called in order for changes to take effect.
 		uint8_t SetMotionCueData(
