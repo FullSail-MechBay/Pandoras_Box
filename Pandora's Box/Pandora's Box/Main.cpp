@@ -52,6 +52,7 @@ int main()
 	const int DEFAULT_REMOTE_PORT = 10991;
 	const int GAME_DATATICKRATE = 1000;
 	const int TICKRATE = 500;
+	const uint8_t DATAOUTSTEP_ms = 2;
 
 	//Variables
 	std::chrono::high_resolution_clock timer;
@@ -78,13 +79,13 @@ int main()
 	ThreadSafeBool incomingBufferChanged = false;
 	ThreadSafeBool statusBufferChanged = false;
 	ThreadSafeBool shouldSend = false;
-	ThreadSafeBool shouldRecvGameData = false;
+	ThreadSafeBool shouldRecvGameData = true;
 	ThreadSafeBool shouldRecvStatus = false;
 
 
 	//Setting Up
 	datamanager.SetDataMode(DEFAULT_DATA_MODE);
-
+	datamanager.DataOutStep_ms = DATAOUTSTEP_ms;
 
 
 
@@ -126,10 +127,14 @@ int main()
 					resetPlatform = false;
 					mut.unlock_shared();
 				}
+
 			}
+			datamanager.IncDataFrame();
 			datamanager.IncrimentPacketSequence();
+			datamanager.SyncBufferChanges();
+
 			client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-			std::this_thread::sleep_for(std::chrono::microseconds(1));
+			std::this_thread::sleep_for(std::chrono::milliseconds(DATAOUTSTEP_ms));
 		}
 	};
 
@@ -193,7 +198,7 @@ int main()
 					);*/
 					//const double PI = 3.1415926535897932384626433832795;
 					//std::cout << 1.5708 - packet.m_roll << "\n";
-				datamanager.SetDofData(1.5708 - packet.m_roll, 0.0f, 0.0f, 0.0f, 0.0f, -0.12f);
+			//	datamanager.SetDofData(1.5708 - packet.m_roll, 0.0f, 0.0f, 0.0f, 0.0f, -0.12f);
 				//datamanager.SetDofData(0.0f*packet.m_roll, 0.0f* packet.m_pitch, 0.0f, 10.0f*36.0f * packet.m_z, 0.0f, -0.15f);
 				//std::cout.precision(50);
 				//std::cout << std::fixed << packet.m_z << "\n";
@@ -246,34 +251,20 @@ int main()
 
 		//std::cout << packet.m_yaw << "\n";
 		static auto Lastframe = timer.now();
-		double deltaTime = (double)(timer.now() - Lastframe).count() / 1000000000.0*(double)TICKRATE;
-		double co = 0.0f;
-
-		for (auto& p : packetStack)
-		{
-			p.m_yaw = interpolate(static_cast<double>(lastpacket.m_yaw), static_cast<double>(newPacket.m_yaw), co);
-			co += deltaTime;
-		}
-
-		static	bool test = true;
-		if (test)
-		{
-			for (auto& p : packetStack)
-			{
-				std::cout << p.m_yaw << "\n";
-			}
-			std::cout << co << "\n";
-			test = false;
-		}
+		double deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - Lastframe).count();
+		//std::cout << deltaTime << "\n";
 
 
-		/*datamanager.SetDofData(0.0f*map(static_cast<float>(packet.m_roll), 0.0f, 255.f, -15.0f, 15.f),
-			0.0f* packet.m_pitch,
-			map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), -0.3f, 0.3f),
-			0.0f*packet.m_surge,
-			0.0f*packet.m_sway,
-			-0.09f);*/
-		datamanager.SyncBufferChanges();
+
+
+
+		datamanager.SetDofData(0.5f* map(static_cast<float>(newPacket.m_roll), 0.0f, static_cast<float>(0xffff), -0.2f, 0.2f),
+			0.0f*  map(static_cast<float>(newPacket.m_pitch), 0.0f, static_cast<float>(0xffff), -0.1f, 0.1f),
+			0.0f* map(static_cast<float>(newPacket.m_yaw), 0.0f, static_cast<float>(0xffff), -0.2f, 0.2f),
+			0.0f*newPacket.m_surge,
+			0.0f*newPacket.m_sway,
+			-0.15f, deltaTime);
+
 
 		//std::cout << static_cast<float>(ntohs(packet.m_yaw)) << "\n";
 		//std::cout << map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), -0.3f, 0.3f) << "\n";
