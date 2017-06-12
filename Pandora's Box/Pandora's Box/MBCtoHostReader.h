@@ -36,7 +36,7 @@ namespace DataManager
 		MS_Frozen = 13			// System is Engaged, but motion is currently frozen.
 	};
 
-	const char* MachineStateString[]
+	static const char* MachineStateString[]
 	{
 		"MS_Initializing",
 		"MS_Ready",

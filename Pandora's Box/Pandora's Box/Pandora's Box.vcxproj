@@ -142,12 +142,15 @@
     <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\DirtRallyPacketStructure.h" />
     <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\MBCtoHostReader.h" />
     <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\PlatformDataManager.h" />
+    <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\SignalGenerator.hpp" />
+    <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\SimtoolsPacketStructure.h" />
     <ClInclude Include="..\..\Pandora%27s Box\Pandora%27s Box\UDPClient.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Pandora%27s Box\Pandora%27s Box\Main.cpp" />
     <ClCompile Include="..\..\Pandora%27s Box\Pandora%27s Box\MBCtoHostReader.cpp" />
     <ClCompile Include="..\..\Pandora%27s Box\Pandora%27s Box\PlatformDataManager.cpp" />
+    <ClCompile Include="..\..\Pandora%27s Box\Pandora%27s Box\SignalGenerator.cpp" />
     <ClCompile Include="..\..\Pandora%27s Box\Pandora%27s Box\UDPClient.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

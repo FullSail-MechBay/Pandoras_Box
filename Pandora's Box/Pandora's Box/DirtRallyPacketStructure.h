@@ -9,6 +9,18 @@ namespace DirtRally
 			return sizeof(UDPPacketNoExtra);
 		}
 
+		//	Dirt:Rally 
+		//	X and Y axes are on the ground, Z is up
+		//	Heading	anticlockwise from above (Z)
+		//	Pitch	anticlockwise from right (X)
+		//	Roll	anticlockwise from front (Y)
+		//	Motion Platform:
+		//	X = Forward
+		//	Y = Right Wing
+		//	Z = Down
+		//	Roll about X
+		//	Pitch about Y
+		//	Yaw about Z
 		uint32_t	m_time;
 		float		m_angvelx;
 		float		m_angvely;
