@@ -85,7 +85,7 @@ void PlatformDataManager::PostHeader::Initialize(DataModes _dataMode)
 	Header::Initialize(_dataMode);
 	SetMotionCommandWord();
 	SetStatusResponseWord();
-	if (DataMode_Motion == _dataMode)
+	if (DataMode_MotionCue == _dataMode)
 		SetUpdateRate(Freq_MotionCue);
 }
 void PlatformDataManager::PostHeader::SetStatusResponseWord(FeedBackReq _requestedFeedBack, uint8_t _fileIDNumber, uint16_t _updateRate)
@@ -152,7 +152,7 @@ void PlatformDataManager::Data_PlayBack::Initialize(DataModes _dataMode)
 
 PlatformDataManager::SFXO_3_Direct_Displacement_Buffet::SFXO_3_Direct_Displacement_Buffet(uint32_t _totalNumSineWaves)
 {
-	TotalNumSineWaves = _totalNumSineWaves;
+	TotalNumSineWaves = _totalNumSineWaves < 0 ? 0 : _totalNumSineWaves > 10 ? 10 : _totalNumSineWaves; // keeps total sine waves within proper range.
 	SubData = new SineWaveData[_totalNumSineWaves];
 }
 PlatformDataManager::SFXO_3_Direct_Displacement_Buffet::~SFXO_3_Direct_Displacement_Buffet()
@@ -162,7 +162,7 @@ PlatformDataManager::SFXO_3_Direct_Displacement_Buffet::~SFXO_3_Direct_Displacem
 
 PlatformDataManager::SFXO_4_Displacement_White_Noise::SFXO_4_Displacement_White_Noise(uint32_t _totalNumSignals)
 {
-	TotalNumSignals = _totalNumSignals;
+	TotalNumSignals = _totalNumSignals < 0 ? 0 : _totalNumSignals > 2 ? 2 : _totalNumSignals; // keeps total signals within proper range.
 	SubData = new Amplitude_Data[_totalNumSignals];
 }
 PlatformDataManager::SFXO_4_Displacement_White_Noise::~SFXO_4_Displacement_White_Noise()
@@ -172,7 +172,7 @@ PlatformDataManager::SFXO_4_Displacement_White_Noise::~SFXO_4_Displacement_White
 
 PlatformDataManager::SFXO_7_Acceleration_White_Noise::SFXO_7_Acceleration_White_Noise(uint32_t _totalNumSignals)
 {
-	TotalNumSignals = _totalNumSignals;
+	TotalNumSignals = _totalNumSignals < 0 ? 0 : _totalNumSignals > 2 ? 2 : _totalNumSignals; // keeps total signals within proper range.
 	SubData = new Accel_Data[_totalNumSignals];
 }
 PlatformDataManager::SFXO_7_Acceleration_White_Noise::~SFXO_7_Acceleration_White_Noise()
@@ -182,7 +182,7 @@ PlatformDataManager::SFXO_7_Acceleration_White_Noise::~SFXO_7_Acceleration_White
 
 PlatformDataManager::SFXO_8_Acceleration_Buffets::SFXO_8_Acceleration_Buffets(uint32_t _totalNumSineWaves)
 {
-	TotalNumSineWaves = _totalNumSineWaves;
+	TotalNumSineWaves = _totalNumSineWaves < 0 ? 0 : _totalNumSineWaves > 10 ? 10 : _totalNumSineWaves; // keeps total sine waves within proper range.
 	SubData = new Accel_Data[_totalNumSineWaves];
 }
 PlatformDataManager::SFXO_8_Acceleration_Buffets::~SFXO_8_Acceleration_Buffets()
@@ -285,7 +285,7 @@ void PlatformDataManager::IncDataFrame()
 		}
 		break;
 	}
-	case DataManager::DataMode_Motion:
+	case DataManager::DataMode_MotionCue:
 	{
 		/*Data_MotionCue* currBuff = (Data_MotionCue*)DataBuffer;
 		Data_MotionCue* IncBuff = (Data_MotionCue*)DataBufferDiff;
@@ -427,7 +427,7 @@ uint8_t PlatformDataManager::SetMotionCueData(
 	float _accelRoll, float _accelPitch, float _accelYaw, float _accelSurge, float _accelSway, float _accelHeave,
 	float _multiplier)
 {
-	if (Failed != SetDataMode(DataMode_Motion))
+	if (Failed != SetDataMode(DataMode_MotionCue))
 	{
 		Data_MotionCue* MCAccess = (Data_MotionCue*)DataBuffer;
 		MCAccess->Angle_Roll = _angelRoll;
@@ -469,7 +469,7 @@ void PlatformDataManager::Helper_SetUpDefualtData(DataModes _dataMode)
 			DataModeHeaders[CurrMode] = new Data_Length();
 			((Data_Length*)DataModeHeaders[CurrMode])->Initialize(CurrMode);
 			break;
-		case DataManager::DataMode_Motion:
+		case DataManager::DataMode_MotionCue:
 			DataModeHeaders[CurrMode] = new Data_MotionCue();
 			((Data_MotionCue*)DataModeHeaders[CurrMode])->Initialize(CurrMode);
 			break;
@@ -502,16 +502,16 @@ bool PlatformDataManager::Helper_CalculateFrameDiff(float _deltaT)
 {
 	if (_deltaT <= DataOutStep_ms || (DataOutStep_ms < FLT_EPSILON && DataOutStep_ms > -FLT_EPSILON))
 	{
-		FrameSlicesRemaining = 0;
+		FrameSlicesRemaining = -1;
 		FramesDiff = 1.0f;
 		return false;
 	}
 
 	FramesDiff = _deltaT / (DataOutStep_ms == 0 ? FLT_EPSILON : DataOutStep_ms);
-	FrameSlicesRemaining = FramesDiff;
+	FrameSlicesRemaining = (int)FramesDiff;
 	if (FirstPacket)
 	{
-		FrameSlicesRemaining = 0;
+		FrameSlicesRemaining = -1;
 		FramesDiff = 1.0f;
 		FirstPacket = false;
 	}
