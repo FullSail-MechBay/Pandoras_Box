@@ -226,7 +226,7 @@ void PlatformDataManager::SyncBufferChanges()
 
 void PlatformDataManager::IncDataFrame()
 {
-	if (0 >= FrameSlicesRemaining)
+	if (-1 >= FrameSlicesRemaining)
 		return;
 	FrameSlicesRemaining--;
 	switch (CurrMode)
@@ -234,7 +234,7 @@ void PlatformDataManager::IncDataFrame()
 	case DataManager::DataMode_DOF:
 	{
 		Data_Dof* currBuff = (Data_Dof*)DataBuffer;
-		if (0 == FrameSlicesRemaining)
+		if (-1 == FrameSlicesRemaining)
 		{
 			Data_Dof* latestPacket = (Data_Dof*)NewestPacket;
 
@@ -261,7 +261,7 @@ void PlatformDataManager::IncDataFrame()
 	case DataManager::DataMode_Length:
 	{
 		Data_Length* currBuff = (Data_Length*)DataBuffer;
-		if (0 == FrameSlicesRemaining)
+		if (-1 == FrameSlicesRemaining)
 		{
 			Data_Length* latestPacket = (Data_Length*)NewestPacket;
 
