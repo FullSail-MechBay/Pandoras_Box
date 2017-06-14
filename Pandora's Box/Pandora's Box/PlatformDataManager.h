@@ -14,7 +14,7 @@ namespace DataManager
 
 	enum DataModes
 	{
-		DataMode_DOF, DataMode_Length, DataMode_Motion, DataMode_PlayBack, DataMode_NumModes
+		DataMode_DOF, DataMode_Length, DataMode_MotionCue, DataMode_PlayBack, DataMode_NumModes
 	};
 
 	enum Command_State
@@ -57,7 +57,7 @@ namespace DataManager
 		Freq_Dof = 500,
 		Freq_Length = 2000,
 		Freq_MotionCue = 60,
-		Freq_PlayBack = 0
+		Freq_PlayBack = 30
 	};
 
 #pragma endregion
@@ -184,16 +184,16 @@ namespace DataManager
 
 		struct SFXO_2_Direct_Displacement_Length
 		{
-			float Leg_A = 0;	// Meters
-			float Leg_B = 0;	// Meters
-			float Leg_C = 0;	// Meters
-			float Leg_D = 0;	// Meters
-			float Leg_E = 0;	// Meters
-			float Leg_F = 0;	// Meters
+			float Leg_A = 0;			// Meters
+			float Leg_B = 0;			// Meters
+			float Leg_C = 0;			// Meters
+			float Leg_D = 0;			// Meters
+			float Leg_E = 0;			// Meters
+			float Leg_F = 0;			// Meters
 			uint32_t SpecialEffects = SFX_NO_EFFECT;
 		};
 
-		// (Cannot be used simultaneously with Special Effects Option 8) 
+		// (Cannot be used simultaneously with Special Effects Option 8(Acceleration Buffets)) 
 		struct SFXO_3_Direct_Displacement_Buffet
 		{
 			struct SineWaveData
@@ -206,11 +206,12 @@ namespace DataManager
 			uint32_t TotalNumSineWaves = 0;		// Value range : 0 - 10
 			SineWaveData* SubData = nullptr;
 			uint32_t SpecialEffects = SFX_NO_EFFECT;
+			// _totalNumSineWaves : Value range : 0 - 10
 			SFXO_3_Direct_Displacement_Buffet(uint32_t _totalNumSineWaves);
 			~SFXO_3_Direct_Displacement_Buffet();
 		};
 
-		// NOTE: USE OF OPTION 4 IS NOT RECOMMENDED. IT IS AVAILABLE FOR LEGACY SYSTEMS. OPTION 7 SHOULD BE USED INSTEAD. (Cannot be used simultaneously with Special Effects Option 7)
+		// NOTE: USE OF OPTION 4(Displacement White Noise) IS NOT RECOMMENDED. IT IS AVAILABLE FOR LEGACY SYSTEMS. OPTION 7(Acceleration White Noise) SHOULD BE USED INSTEAD. (Cannot be used simultaneously with Special Effects Option 7(Acceleration White Noise))
 		struct SFXO_4_Displacement_White_Noise
 		{
 			struct Amplitude_Data
@@ -243,7 +244,7 @@ namespace DataManager
 			uint32_t SpecialEffects = SFX_NO_EFFECT;
 		};
 
-		// (Cannot be used simultaneously with Special Effects Option 4)
+		// (Cannot be used simultaneously with Special Effects Option 4(Displacement White Noise))
 		struct SFXO_7_Acceleration_White_Noise
 		{
 			struct Accel_Data
@@ -266,7 +267,7 @@ namespace DataManager
 			~SFXO_7_Acceleration_White_Noise();
 		};
 
-		// (Cannot be used simultaneously with Special Effects Option 3)
+		// (Cannot be used simultaneously with Special Effects Option 3(Direct Displacement Buffet))
 		struct SFXO_8_Acceleration_Buffets
 		{
 			struct Accel_Data
@@ -301,10 +302,10 @@ namespace DataManager
 
 		DataModes		CurrMode;
 		uint32_t		DataByteSize;
-		uint8_t*		DataBuffer;
-		uint8_t*		NewestPacket;
-		uint8_t*		DataSwapBuffer;
-		uint8_t*		DataBufferDiff;
+		uint8_t*		DataBuffer;			// Data buffer used for doing data changes before syncing.
+		uint8_t*		NewestPacket;		// Used to record the most recent data packetValues used for doing Interpolation.
+		uint8_t*		DataSwapBuffer;		// Buffer that is used for sending out data, data is copied from DataBuffer and invereted for network byte order.
+		uint8_t*		DataBufferDiff;		// Buffer used to store the frame slice differences between packets when interpolating.
 		PostHeader*		DataModeHeaders[DataMode_NumModes];
 
 		SFXO_1_Direct_Displacement_DOF*		DataSFX01;
@@ -383,7 +384,7 @@ namespace DataManager
 				return Freq_Dof;
 			case DataManager::DataMode_Length:
 				return Freq_Length;
-			case DataManager::DataMode_Motion:
+			case DataManager::DataMode_MotionCue:
 				return Freq_MotionCue;
 			case DataManager::DataMode_PlayBack:
 				return Freq_PlayBack;
