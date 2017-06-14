@@ -1,7 +1,6 @@
 #include <array>
 #include <future>
 #include <chrono>
-#include <ctime>
 #include <iostream>
 #include <atomic>
 #include <condition_variable>
@@ -16,14 +15,14 @@
 
 
 template <typename T>
-constexpr T map(T x, T in_min, T in_max, T out_min, T out_max)
+constexpr  T map(T x, T in_min, T in_max, T out_min, T out_max)
 {
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
 
 //Helper constant expressions 
-constexpr inline int GetWaitTimeinMills(int hz)
+constexpr  int GetWaitTimeinMills(int hz)
 {
 	return 1000 / hz;
 }
@@ -31,7 +30,7 @@ constexpr inline int GetWaitTimeinMills(int hz)
 
 
 
-inline double interpolate(double start, double end, double coefficient)
+double interpolate(double start, double end, double coefficient)
 {
 	return start + coefficient * (end - start);
 }
@@ -50,21 +49,16 @@ int main()
 	const auto DEFAULT_DATA_MODE = DataManager::DataMode_DOF;
 	const auto DEFAULT_REMOTE_IP = "192.168.21.3";
 	const int DEFAULT_REMOTE_PORT = 10991;
-	const int GAME_DATATICKRATE = 1000;
-	const int TICKRATE = 500;
 	const uint8_t DATAOUTSTEP_ms = 2;
 
 	//Variables
-	std::chrono::high_resolution_clock timer;
+	std::chrono::high_resolution_clock hiZtimer;
 	std::shared_mutex mut;
 	std::condition_variable_any cv;
-	CSignalGenerator generator;
-	generator.SetParameters(CSignalGenerator::eWAVEFORM_SINE, 0.5, 0.1, 0.0, GAME_DATATICKRATE);
+
 
 	//Receiving Buffers
 	std::array<uint8_t, Simtools::DOFPacket::GetStructSizeinByte()> incomingbuffer;
-	std::array<Simtools::DOFPacket, TICKRATE> packetStack;
-	ZeroMemory(packetStack.data(), packetStack.size() * Simtools::DOFPacket::GetStructSizeinByte());
 
 
 	UDPClient client(DEFAULT_REMOTE_IP, DEFAULT_REMOTE_PORT);
@@ -79,8 +73,10 @@ int main()
 	ThreadSafeBool incomingBufferChanged = false;
 	ThreadSafeBool statusBufferChanged = false;
 	ThreadSafeBool shouldSend = false;
-	ThreadSafeBool shouldRecvGameData = true;
+	ThreadSafeBool shouldRecvGameData = false;
 	ThreadSafeBool shouldRecvStatus = false;
+
+	ThreadSafeBool axisControl[6]{ true,true,true,true,true,true };
 
 
 	//Setting Up
@@ -89,19 +85,7 @@ int main()
 
 
 
-	//auto SinYaw = [&datamanager, &platformBufferSize, &generator, &timer]()
-	//{
 
-	//	float yaw = generator.GetSample();
-
-
-	//	//yaw = map(static_cast<float>(yaw), -1.0f, 1.0f, -0.3f, 0.3f);
-	//	//std::cout << "TimeStamp: " <<(timer.now().time_since_epoch().count()/1000000) << "\t" << yaw << "\n";
-	//	datamanager.SetDofData(0.0f, 0.0f, yaw, 0.0f, 0.0f, -0.12f);
-	//	datamanager.SyncBufferChanges();
-	//	platformBufferSize = datamanager.GetDataSize();
-	//	//std::this_thread::sleep_for(std::chrono::microseconds(500));
-	//};
 
 	auto SendingToPlatform = [&]()
 	{
@@ -166,64 +150,7 @@ int main()
 
 
 
-	auto parseGameDataMotionCue = [&]()
-	{
-		if (incomingBufferChanged)
-		{
-			incomingBufferChanged = false;
-			if (mut.try_lock())
-			{
-				//No need to convert endianness
-				DirtRally::UDPPacketNoExtra packet;
-				ZeroMemory(&packet, sizeof packet);
-				memcpy(&packet, incomingbuffer.data(), sizeof(packet));
-				// Converting to platform data struct
-				//	Dirt:Rally 
-				//	X and Y axes are on the ground, Z is up
-				//	Heading	anticlockwise from above (Z)
-				//	Pitch	anticlockwise from right (X)
-				//	Roll	anticlockwise from front (Y)
-				//	Motion Platform:
-				//	X = Forward
-				//	Y = Right Wing
-				//	Z = Down
-				//	Roll about X
-				//	Pitch about Y
-				//	Yaw about Z
-				/*datamanager.SetMotionCueData
-				(	packet.m_roll, packet.m_pitch, packet.m_heading,
-					packet.m_angvely, packet.m_angvelx, packet.m_angvelz,
-					packet.m_accely, packet.m_accelx, packet.m_accelz,
-					packet.m_vely, packet.m_velx, packet.m_velz
-					);*/
-					//const double PI = 3.1415926535897932384626433832795;
-					//std::cout << 1.5708 - packet.m_roll << "\n";
-			//	datamanager.SetDofData(1.5708 - packet.m_roll, 0.0f, 0.0f, 0.0f, 0.0f, -0.12f);
-				//datamanager.SetDofData(0.0f*packet.m_roll, 0.0f* packet.m_pitch, 0.0f, 10.0f*36.0f * packet.m_z, 0.0f, -0.15f);
-				//std::cout.precision(50);
-				//std::cout << std::fixed << packet.m_z << "\n";
-				datamanager.SyncBufferChanges();
-				platformBufferSize = datamanager.GetDataSize();
-				mut.unlock();
-			}
-		}
 
-		//{ // Testing 
-		//	static float heave = -0.1f;
-		//	static float step = 0.00002f;
-		//	heave -= step;
-		//	if (heave <= -0.3f || heave >= -0.1f)
-		//	{
-		//		step *= -1.0f;
-		//	}
-
-		//	//std::cout << heave << "\n";
-		//	datamanager.SetDofData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, heave);
-		//	datamanager.SyncBufferChanges();
-		//	platformBufferSize = datamanager.GetDataSize();
-		//}
-		//std::this_thread::sleep_for(std::chrono::milliseconds(GetWaitTimeinMills(GAME_DATATICKRATE)));
-	};
 
 
 
@@ -238,41 +165,44 @@ int main()
 	auto parseGameDataDOF = [&]()
 	{
 		std::unique_lock<std::shared_mutex> lk(mut);
-		static Simtools::DOFPacket lastpacket;
-		Simtools::DOFPacket newPacket;
-		ZeroMemory(&newPacket, Simtools::DOFPacket::GetStructSizeinByte());
-		memcpy(&newPacket, incomingbuffer.data(), Simtools::DOFPacket::GetStructSizeinByte());
-		newPacket.m_heave = ntohs(newPacket.m_heave);
-		newPacket.m_pitch = ntohs(newPacket.m_pitch);
-		newPacket.m_roll = ntohs(newPacket.m_roll);
-		newPacket.m_surge = ntohs(newPacket.m_surge);
-		newPacket.m_sway = ntohs(newPacket.m_sway);
-		newPacket.m_yaw = ntohs(newPacket.m_yaw);
+		Simtools::DOFPacket packet;
+		ZeroMemory(&packet, Simtools::DOFPacket::GetStructSizeinByte());
+		memcpy(&packet, incomingbuffer.data(), Simtools::DOFPacket::GetStructSizeinByte());
 
-		//std::cout << packet.m_yaw << "\n";
-		static auto Lastframe = timer.now();
-		double deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(timer.now() - Lastframe).count();
-		//std::cout << deltaTime << "\n";
+		//for (auto& field : packet.m_array)
+		//{
+		//	field = ntohs(field);
+		//}
 
-
+		packet.m_roll = ntohs(packet.m_roll);
+		packet.m_pitch = ntohs(packet.m_pitch);
+		packet.m_yaw = ntohs(packet.m_yaw);
+		packet.m_surge = ntohs(packet.m_surge);
+		packet.m_sway = ntohs(packet.m_sway);
+		packet.m_heave = ntohs(packet.m_heave);
 
 
-
-		datamanager.SetDofData(0.5f* map(static_cast<float>(newPacket.m_roll), 0.0f, static_cast<float>(0xffff), -0.2f, 0.2f),
-			0.0f*  map(static_cast<float>(newPacket.m_pitch), 0.0f, static_cast<float>(0xffff), -0.1f, 0.1f),
-			0.0f* map(static_cast<float>(newPacket.m_yaw), 0.0f, static_cast<float>(0xffff), -0.2f, 0.2f),
-			0.0f*newPacket.m_surge,
-			0.0f*newPacket.m_sway,
-			-0.15f, deltaTime);
+		static auto Lastframe = hiZtimer.now();
+		float deltaTime = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(hiZtimer.now() - Lastframe).count());
 
 
-		//std::cout << static_cast<float>(ntohs(packet.m_yaw)) << "\n";
-		//std::cout << map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), -0.3f, 0.3f) << "\n";
+		static constexpr float RPY_LIMIT = 0.5f; //Roll Pitch Yaw Limits
+		static constexpr float SURGE_SWAY_LIMIT = 0.4f;
+		static constexpr float HEAVE_MIN = 0.05f;
+		static constexpr float HEAVE_MAX = 0.45f;
+
+		float roll = (axisControl[0] ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_roll), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
+		float pitch = (axisControl[1] ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_pitch), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
+		float yaw = (axisControl[2] ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
+		float surge = (axisControl[3] ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_surge), 0.0f, static_cast<float>(0xffff), -SURGE_SWAY_LIMIT, SURGE_SWAY_LIMIT);
+		float sway = (axisControl[4] ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_sway), 0.0f, static_cast<float>(0xffff), -SURGE_SWAY_LIMIT, SURGE_SWAY_LIMIT);
+		float heave = -map(static_cast<float>(packet.m_heave), 0.0f, static_cast<float>(0xffff), HEAVE_MIN, HEAVE_MAX);
+		axisControl[5] ? true : heave = -0.15f;
+		datamanager.SetDofData(roll, pitch, yaw, surge, sway, heave, deltaTime);
 		platformBufferSize = datamanager.GetDataSize();
 
+		Lastframe = hiZtimer.now();
 
-		Lastframe = timer.now();
-		memcpy(&lastpacket, &newPacket, sizeof newPacket);
 	};
 
 
@@ -302,7 +232,7 @@ int main()
 				//}
 			}
 
-			//std::this_thread::sleep_for(std::chrono::milliseconds(GetWaitTimeinMills(GAME_DATATICKRATE)));
+
 		}
 	};
 
@@ -323,18 +253,36 @@ int main()
 	auto Reset = [&shouldSend, &resetPlatform, &cv]()
 	{
 		resetPlatform = true;
-		shouldSend = true;
 		cv.notify_all();
+	};
+	auto DisengagePlatform = [&datamanager, &client, &platformBufferPtr, &platformBufferSize]()
+	{
+		datamanager.SetCommandState(DataManager::CommandState_DISENGAGE);
+		datamanager.IncrimentPacketSequence();
+		datamanager.SyncBufferChanges();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		datamanager.SetCommandState(DataManager::CommandState_RESET);
+		datamanager.IncrimentPacketSequence();
+		datamanager.SyncBufferChanges();
+		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
 	};
 
 
-	const uint8_t NUM_BUFFERED_KEYS = 4;
+	constexpr uint8_t NUM_BUFFERED_KEYS = 5 + 6;
 	bool wasKeyPressed[NUM_BUFFERED_KEYS]{ false };
 	bool isKeyPressed[NUM_BUFFERED_KEYS]{ false };
 	uint8_t i = 0;
-	Reset();
 
 
+	std::cout
+		<< "Press G to Reset Platform \n"
+		<< "Press D to Disengage Platform \n"
+		<< "Press H to toggle receiving motion Data \n"
+		<< "Press J to toggle receiving status Data \n"
+		<< "Press K to toggle sending motion Data \n";
+	std::cout << "Receiving Motion Data: " << (shouldRecvGameData ? "On" : "Off") << "\n";
+	std::cout << "Sending Motion Data: " << (shouldSend ? "On" : "Off") << "\n";
+	std::cout << "Receiving Status Data: " << (shouldRecvStatus ? "On" : "Off") << "\n";
 	while (isProgramRunning)
 	{
 
@@ -349,6 +297,7 @@ int main()
 		if (isKeyPressed[i] && !wasKeyPressed[i])
 		{
 			Reset();
+			std::cout << "Platform Reset command issued.\n";
 		}
 		wasKeyPressed[i] = isKeyPressed[i];
 		++i;
@@ -358,15 +307,17 @@ int main()
 		if (isKeyPressed[i] && !wasKeyPressed[i])
 		{
 			shouldRecvGameData = !shouldRecvGameData;
+			std::cout << "Receiving Motion Data: " << (shouldRecvGameData ? "On" : "Off") << "\n";
 			cv.notify_all();
 		}
 		wasKeyPressed[i] = isKeyPressed[i];
-		++i;
+		i++;
 
 		isKeyPressed[i] = GetAsyncKeyState('K');
 		if (isKeyPressed[i] && !wasKeyPressed[i])
 		{
-			shouldRecvGameData = !shouldRecvGameData;
+			shouldSend = !shouldSend;
+			std::cout << "Sending Motion Data: " << (shouldSend ? "On" : "Off") << "\n";
 			cv.notify_all();
 		}
 		wasKeyPressed[i] = isKeyPressed[i];
@@ -376,13 +327,35 @@ int main()
 		if (isKeyPressed[i] && !wasKeyPressed[i])
 		{
 			shouldRecvStatus = !shouldRecvStatus;
+			std::cout << "Receiving Status Data: " << (shouldRecvStatus ? "On" : "Off") << "\n";
 			cv.notify_all();
 		}
 		wasKeyPressed[i] = isKeyPressed[i];
+		i++;
+
+
+		isKeyPressed[i] = GetAsyncKeyState('D');
+		if (isKeyPressed[i] && !wasKeyPressed[i])
+		{
+			DisengagePlatform();
+			std::cout << "Disengage Platform\n";
+		}
+		wasKeyPressed[i] = isKeyPressed[i];
+		++i;
+
+		//Axis controls
+		for (char j = 0; j < 6; j++)
+		{
+			isKeyPressed[i] = GetAsyncKeyState(char(49 + j));
+			if (isKeyPressed[i] && !wasKeyPressed[i])
+			{
+				axisControl[j] = !axisControl[j];
+				std::cout << "Axis " << char(49 + j) << ": " << (axisControl[j] ? "On" : "Off") << "\n";
+			}
+			wasKeyPressed[i] = isKeyPressed[i];
+			++i;
+		}
 		i = 0;
-
-
-
 	}
 
 
@@ -390,14 +363,7 @@ int main()
 	//Shutdown block
 	{
 		//Shutdown Platform
-		datamanager.SetCommandState(DataManager::CommandState_DISENGAGE);
-		datamanager.IncrimentPacketSequence();
-		datamanager.SyncBufferChanges();
-		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
-		datamanager.SetCommandState(DataManager::CommandState_RESET);
-		datamanager.IncrimentPacketSequence();
-		datamanager.SyncBufferChanges();
-		client.Send(reinterpret_cast<const char *>(platformBufferPtr), platformBufferSize);
+		DisengagePlatform();
 		//Shutdown sockets
 		client.Shutdown();
 		//Join all other threads
