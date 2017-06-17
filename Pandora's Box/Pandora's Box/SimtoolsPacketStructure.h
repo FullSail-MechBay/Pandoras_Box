@@ -2,7 +2,7 @@
 #include <cstdint>
 namespace Simtools
 {
-	union DOFPacket
+	struct DOFPacket
 	{
 		static constexpr size_t GetStructSizeinByte()
 		{
@@ -15,7 +15,6 @@ namespace Simtools
 		uint16_t	m_yaw;
 		uint16_t	m_sway;
 		uint16_t	m_surge;
-		uint16_t	m_array[6];
 	};
 
 
