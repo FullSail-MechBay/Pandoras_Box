@@ -182,19 +182,27 @@ int main()
 		static auto Lastframe = hiZtimer.now();
 		float deltaTime = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(hiZtimer.now() - Lastframe).count());
 
+		static constexpr float ROLL_MIN = -0.32498031f;
+		static constexpr float ROLL_MAX = 0.32498031f;
+		static constexpr float PITCH_MIN = -0.31503193f;
+		static constexpr float PITCH_MAX = 0.32829643f;
+		static constexpr float YAW_MIN = -0.4066617f;
+		static constexpr float YAW_MAX = 0.4066617f;
+		static constexpr float SURGE_MIN = -0.229235f;
+		static constexpr float SURGE_MAX = 0.260604f;
+		static constexpr float SWAY_MIN = -0.221996f;
+		static constexpr float SWAY_MAX = 0.221996f;
+		static constexpr float HEAVE_MIN = 0.0397891f;
+		static constexpr float HEAVE_MAX = 0.4017391f;
+		static constexpr float HEAVE_DEFAULT = -0.15f;
 
-		static constexpr float RPY_LIMIT = 0.5f; //Roll Pitch Yaw Limits
-		static constexpr float SURGE_SWAY_LIMIT = 0.4f;
-		static constexpr float HEAVE_MIN = 0.05f;
-		static constexpr float HEAVE_MAX = 0.45f;
-
-		float roll = (axisControl[0].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_roll), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
-		float pitch = (axisControl[1].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_pitch), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
-		float yaw = (axisControl[2].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
-		float surge = (axisControl[3].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_surge), 0.0f, static_cast<float>(0xffff), -SURGE_SWAY_LIMIT, SURGE_SWAY_LIMIT);
-		float sway = (axisControl[4].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_sway), 0.0f, static_cast<float>(0xffff), -SURGE_SWAY_LIMIT, SURGE_SWAY_LIMIT);
+		float roll = (axisControl[0].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_roll), 0.0f, static_cast<float>(0xffff), ROLL_MIN, ROLL_MAX);
+		float pitch = (axisControl[1].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_pitch), 0.0f, static_cast<float>(0xffff), PITCH_MIN, PITCH_MAX);
+		float yaw = (axisControl[2].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), YAW_MIN, YAW_MAX);
+		float surge = (axisControl[3].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_surge), 0.0f, static_cast<float>(0xffff), SURGE_MIN, SURGE_MAX);
+		float sway = (axisControl[4].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_sway), 0.0f, static_cast<float>(0xffff), SWAY_MIN, SWAY_MAX);
 		float heave = -map(static_cast<float>(packet.m_heave), 0.0f, static_cast<float>(0xffff), HEAVE_MIN, HEAVE_MAX);
-		heave = (axisControl[5].load()) ? heave : -0.15f;
+		heave = (axisControl[5].load()) ? heave : HEAVE_DEFAULT;
 		datamanager.SetDofData(roll, pitch, yaw, surge, sway, heave, deltaTime);
 		platformBufferSize = datamanager.GetDataSize();
 
