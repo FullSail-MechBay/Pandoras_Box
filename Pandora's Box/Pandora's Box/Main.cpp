@@ -58,7 +58,7 @@ int main()
 
 
 	//Receiving Buffers
-	std::array<uint8_t, Simtools::DOFPacket::GetStructSizeinByte()> incomingbuffer{0};
+	std::array<uint8_t, Simtools::DOFPacket::GetStructSizeinByte()> incomingbuffer{ 0 };
 
 
 	UDPClient client(DEFAULT_REMOTE_IP, DEFAULT_REMOTE_PORT);
@@ -171,12 +171,12 @@ int main()
 
 
 
-		packet.m_roll =		static_cast<uint16_t>(ntohs(packet.m_roll));
-		packet.m_pitch =	static_cast<uint16_t>(ntohs(packet.m_pitch));
-		packet.m_yaw =		static_cast<uint16_t>(ntohs(packet.m_yaw));
-		packet.m_surge =	static_cast<uint16_t>(ntohs(packet.m_surge));
-		packet.m_sway =		static_cast<uint16_t>(ntohs(packet.m_sway));
-		packet.m_heave =	static_cast<uint16_t>(ntohs(packet.m_heave));
+		packet.m_roll = static_cast<uint16_t>(ntohs(packet.m_roll));
+		packet.m_pitch = static_cast<uint16_t>(ntohs(packet.m_pitch));
+		packet.m_yaw = static_cast<uint16_t>(ntohs(packet.m_yaw));
+		packet.m_surge = static_cast<uint16_t>(ntohs(packet.m_surge));
+		packet.m_sway = static_cast<uint16_t>(ntohs(packet.m_sway));
+		packet.m_heave = static_cast<uint16_t>(ntohs(packet.m_heave));
 
 
 		static auto Lastframe = hiZtimer.now();
@@ -189,12 +189,12 @@ int main()
 		static constexpr float HEAVE_MAX = 0.45f;
 
 		float roll = (axisControl[0].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_roll), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
-		float pitch = (axisControl[1] ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_pitch), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
-		float yaw = (axisControl[2] ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
-		float surge = (axisControl[3] ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_surge), 0.0f, static_cast<float>(0xffff), -SURGE_SWAY_LIMIT, SURGE_SWAY_LIMIT);
-		float sway = (axisControl[4] ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_sway), 0.0f, static_cast<float>(0xffff), -SURGE_SWAY_LIMIT, SURGE_SWAY_LIMIT);
+		float pitch = (axisControl[1].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_pitch), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
+		float yaw = (axisControl[2].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), -RPY_LIMIT, RPY_LIMIT);
+		float surge = (axisControl[3].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_surge), 0.0f, static_cast<float>(0xffff), -SURGE_SWAY_LIMIT, SURGE_SWAY_LIMIT);
+		float sway = (axisControl[4].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_sway), 0.0f, static_cast<float>(0xffff), -SURGE_SWAY_LIMIT, SURGE_SWAY_LIMIT);
 		float heave = -map(static_cast<float>(packet.m_heave), 0.0f, static_cast<float>(0xffff), HEAVE_MIN, HEAVE_MAX);
-		heave =  (axisControl[5]) ? heave :  -0.15f;
+		heave = (axisControl[5].load()) ? heave : -0.15f;
 		datamanager.SetDofData(roll, pitch, yaw, surge, sway, heave, deltaTime);
 		platformBufferSize = datamanager.GetDataSize();
 
