@@ -76,7 +76,6 @@ int main()
 	ThreadSafeBool shouldRecvGameData = false;
 	ThreadSafeBool shouldRecvStatus = false;
 
-	ThreadSafeBool axisControl[6]{ true,true,true,true,true,true };
 
 
 	//Setting Up
@@ -194,15 +193,15 @@ int main()
 		static constexpr float SWAY_MAX = 0.221996f;
 		static constexpr float HEAVE_MIN = 0.0397891f;
 		static constexpr float HEAVE_MAX = 0.4017391f;
-		static constexpr float HEAVE_DEFAULT = -0.15f;
 
-		float roll = (axisControl[0].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_roll), 0.0f, static_cast<float>(0xffff), ROLL_MIN, ROLL_MAX);
-		float pitch = (axisControl[1].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_pitch), 0.0f, static_cast<float>(0xffff), PITCH_MIN, PITCH_MAX);
-		float yaw = (axisControl[2].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), YAW_MIN, YAW_MAX);
-		float surge = (axisControl[3].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_surge), 0.0f, static_cast<float>(0xffff), SURGE_MIN, SURGE_MAX);
-		float sway = (axisControl[4].load() ? 1.0f : 0.0f) * map(static_cast<float>(packet.m_sway), 0.0f, static_cast<float>(0xffff), SWAY_MIN, SWAY_MAX);
+
+		float roll = map(static_cast<float>(packet.m_roll), 0.0f, static_cast<float>(0xffff), ROLL_MIN, ROLL_MAX);
+		float pitch = map(static_cast<float>(packet.m_pitch), 0.0f, static_cast<float>(0xffff), PITCH_MIN, PITCH_MAX);
+		float yaw =  map(static_cast<float>(packet.m_yaw), 0.0f, static_cast<float>(0xffff), YAW_MIN, YAW_MAX);
+		float surge = map(static_cast<float>(packet.m_surge), 0.0f, static_cast<float>(0xffff), SURGE_MIN, SURGE_MAX);
+		float sway =  map(static_cast<float>(packet.m_sway), 0.0f, static_cast<float>(0xffff), SWAY_MIN, SWAY_MAX);
 		float heave = -map(static_cast<float>(packet.m_heave), 0.0f, static_cast<float>(0xffff), HEAVE_MIN, HEAVE_MAX);
-		heave = (axisControl[5].load()) ? heave : HEAVE_DEFAULT;
+
 		datamanager.SetDofData(roll, pitch, yaw, surge, sway, heave, deltaTime);
 		platformBufferSize = datamanager.GetDataSize();
 
@@ -346,20 +345,6 @@ int main()
 			std::cout << "Disengage Platform\n";
 		}
 		wasKeyPressed[i] = isKeyPressed[i];
-		++i;
-
-		//Axis controls
-		for (char j = 0; j < 6; j++)
-		{
-			isKeyPressed[i] = GetAsyncKeyState(char(49 + j));
-			if (isKeyPressed[i] && !wasKeyPressed[i])
-			{
-				axisControl[j] = !axisControl[j];
-				std::cout << "Axis " << char(49 + j) << ": " << (axisControl[j] ? "On" : "Off") << "\n";
-			}
-			wasKeyPressed[i] = isKeyPressed[i];
-			++i;
-		}
 		i = 0;
 	}
 
